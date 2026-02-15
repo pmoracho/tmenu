@@ -1,0 +1,6 @@
+"Menu Principal":
+  "Un ejemplo de un item"[2]: "comando a ejecutar", "Otra Configuracion"
+  "Otra cosa"[2]: comando,otraconf
+  "Un submenu":
+    "Ejemplo 1"[2]: comando,otraconf,
+    "Ejemplo 2"[2]: comando,otraconf    

@@ -1,0 +1,13 @@
+[package]
+name = "menu-rs"
+version = "0.1.0"
+edition = "2024"
+authors = ["Patricio Moracho\n<pmoracho@gmail.com>",]
+repository = "https://github.com/pmoracho/menu-rs"
+description = "Un menu interactivo y configurable para terminales"
+
+[dependencies]
+ratatui = "0.30.0"
+crossterm = "0.28"
+toon-format = "0.3"
+serde = { version = "1.0", features = ["derive"] }
