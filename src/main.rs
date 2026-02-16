@@ -44,11 +44,25 @@ struct App {
     state: ListState,
 }
 
+/// Implementación de la lógica principal de la aplicación, incluyendo la carga del menú desde un archivo, 
+/// navegación entre items, ejecución de comandos y manejo de submenús. Esta implementación se encarga 
+/// de mantener el estado actual del menú, gestionar el historial para permitir volver atrás, y ejecutar
+/// comandos externos de manera segura, restaurando la terminal antes de la ejecución y reconfigurándola 
+/// después de la ejecución para asegurar una experiencia de usuario fluida y sin interrupciones. Además
+/// incluye la lógica para parsear el formato específico del archivo .toon, permitiendo una estructura de
+/// menú jerárquica con submenús y comandos asociados a cada item.
 impl App {
     // Este método devuelve el título actual y la referencia a los items
     fn current_data(&self) -> (&String, &Vec<MenuItem>) {
         (&self.current_title, &self.current_items)
     }
+    /// Carga el menú desde un archivo .toon, parseando su contenido para construir la estructura de menú en memoria.
+    /// - `path`: Ruta al archivo .toon que contiene la definición del menú.
+    /// Devuelve una instancia de App con el menú cargado y listo para ser utilizado en
+    /// la aplicación. El método maneja posibles errores de lectura y parseo, devolviendo un error si el
+    /// archivo no se puede leer o si su formato no es válido. El formato esperado del archivo .toon 
+    /// incluye líneas que definen títulos de menú, submenús y comandos asociados a cada item, 
+    /// permitiendo una estructura jerárquica de menú con múltiples niveles de submenús 
     fn from_toon(path: &str) -> Result<Self, Box<dyn Error>> {
         let content = fs::read_to_string(path)?;
         let mut root_items: Vec<MenuItem> = Vec::new();
@@ -190,7 +204,11 @@ impl App {
     }
 }
 
-
+/// Función principal que inicializa la aplicación, configura la terminal y maneja el ciclo de eventos.
+/// - Se encarga de parsear los argumentos de línea de comandos utilizando Clap, cargar el
+/// archivo de menú especificado, configurar la terminal en modo raw y alternativo, y luego iniciar el ciclo de eventos que maneja la interacción del usuario. Al finalizar, restaura la terminal a su estado original. Devuelve un Result para manejar posibles errores durante la inicialización o ejecución de la aplicación.
+/// Nota: Es importante manejar los errores de manera adecuada, especialmente al cargar el archivo de menú, para proporcionar una experiencia de usuario clara y evitar que la aplicación falle sin explicación. Además, la configuración y restauración de la terminal es crucial para asegurar que el entorno del usuario no quede en un estado inconsistente después de usar la aplicación.
+/// Importante: Esta función es el punto de entrada de la aplicación y coordina la configuración inicial, la carga de datos y el ciclo principal de eventos, por lo que su correcta implementación es esencial para el funcionamiento general de la aplicación.
 fn main() -> Result<(), Box<dyn Error>> {
     // 1. Parsear argumentos con Clap
     let args = Args::parse();
@@ -225,6 +243,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// Función principal del ciclo de eventos que maneja la interacción del usuario y el renderizado de la interfaz.
+/// - `terminal`: Referencia mutable a la terminal de Ratatui, que se utiliza para dibujar la interfaz de usuario en cada iteración del ciclo.
+/// - `app`: Referencia mutable a la instancia de App que contiene el estado actual del menú, incluyendo el título, los items
+/// y el historial de navegación. Esta función se encarga de:
+///   1. Dibujar la interfaz de usuario llamando a la función `ui` en cada iteración del ciclo.
+///   2. Leer eventos de teclado utilizando Crossterm y responder a las teclas presionadas para navegar por el menú, entrar en submenús,
+/// volver atrás o salir de la aplicación. El ciclo continúa hasta que el usuario decide salir (presionando 'q') o ejecuta un comando que indica salir.
+///   3. Manejar errores de eventos y renderizado, devolviendo un error si ocurre algún problema durante la ejecución.
+/// Nota: El tipo de error específico para eventos de teclado se maneja con un bound en la firma de la función, asegurando que cualquier error relacionado con eventos sea compatible con el tipo de error esperado por Ratatui.
+/// Importante: Esta función es el núcleo de la aplicación, ya que coordina la interacción del usuario y el renderizado dinámico de la interfaz basada en el estado actual del menú.
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<(), Box<dyn Error>>
 where B::Error: Error + 'static {
     loop {
@@ -247,6 +275,16 @@ where B::Error: Error + 'static {
     }
 }
 
+/// Función de renderizado principal que dibuja la interfaz de usuario en cada ciclo de renderizado.
+/// - `f`: Referencia mutable al Frame proporcionado por Ratatui para dibujar los widgets.
+/// - `app`: Referencia mutable a la instancia de App que contiene el estado actual del
+/// menú, incluyendo el título, los items y el estado de selección. Esta función se encarga de:
+///   1. Dibujar un fondo opcional para mejorar la estética.
+///   2. Obtener el título y los items actuales del menú desde la instancia de App.
+///   3. Calcular el ancho máximo necesario para mostrar los items y el título sin recortar texto.
+///   4. Crear un área centrada para el menú, ajustando su tamaño según el contenido y el tamaño de la terminal.
+///   5. Construir los widgets de lista
+///   6. Renderizar el widget de lista con estilos personalizados, incluyendo colores y símbolos para indicar submenús.
 fn ui(f: &mut Frame, app: &mut App) {
 
     // Dibujar un fondo tenue (opcional)
@@ -314,6 +352,12 @@ fn ui(f: &mut Frame, app: &mut App) {
     f.render_stateful_widget(list, area, &mut app.state);
 }
 
+/// Calcula un Rect centrado con un tamaño máximo dado por width y height, pero sin exceder el tamaño del rectángulo original (r).
+/// Si el tamaño calculado es menor que el del rectángulo original, se centra dentro de él.
+/// - `width`: Ancho máximo deseado para el nuevo rectángulo.
+/// - `height`: Alto máximo deseado para el nuevo rectángulo.
+/// - `r`: Rectángulo original que define el área total disponible.
+/// Devuelve un nuevo Rect que es el resultado de aplicar las restricciones de tamaño y centrado.
 fn auto_size_rect(width: u16, height: u16, r: Rect) -> Rect {
     let w = width.min(r.width);
     let h = height.min(r.height);

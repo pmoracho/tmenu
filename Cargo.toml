@@ -1,5 +1,5 @@
 [package]
-name = "menu-rs"
+name = "tmenu"
 version = "0.1.0"
 edition = "2024"
 authors = ["Patricio Moracho\n<pmoracho@gmail.com>",]
