@@ -9,5 +9,4 @@ description = "Un menu interactivo y configurable para terminales"
 [dependencies]
 ratatui = "0.30.0"
 crossterm = "0.28"
-toon-format = "0.3"
-serde = { version = "1.0", features = ["derive"] }
+clap = { version = "4.4", features = ["derive"] }

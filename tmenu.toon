@@ -1,0 +1,6 @@
+"Tareas de este proyecto [rust]":
+  "Ejecutar"[1]: "cargo run"
+  "Clean"[1]: "cargo clean"
+  "Construir":
+    "Release build"[1]: "cargo build --release"
+    "Clean"[2]: "cargo clean"    
