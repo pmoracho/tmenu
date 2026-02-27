@@ -1,6 +1,24 @@
-"Tareas de este proyecto [rust]":
-  "Ejecutar"[1]: "cargo run"
-  "Clean"[1]: "cargo clean"
-  "Construir":
-    "Release build"[1]: "cargo build --release"
-    "Clean"[2]: "cargo clean"    
+"Rust Project":
+  Desarrollo:
+    Ejecutar: cargo run
+    Compilar: cargo build
+    Check: cargo check
+    "Ver Errores (Watch)": cargo watch -x check
+  "Release y Distribución":
+    "Build Optimizado": cargo build --release
+    "Instalar Binario": cargo install --path .
+    "Empaquetar Crates": cargo package
+    "Publicar (Dry Run)": cargo publish --dry-run
+  "Testeo y Calidad":
+    "Tests Unitarios": cargo test
+    "Linter (Clippy)": cargo clippy
+    Formatear: cargo fmt
+    "Seguridad (Audit)": cargo audit
+  Documentación:
+    "Generar Docs": cargo doc
+    "Ver en Navegador": cargo doc --open
+    "Limpiar Documentación": rm -rf target/doc
+  Limpieza:
+    Clean: cargo clean
+    "Reset Cargo": cargo clean && cargo update
+    "Eliminar Lockfile": rm Cargo.lock
