@@ -6,7 +6,18 @@ authors = ["Patricio Moracho\n<pmoracho@gmail.com>",]
 repository = "https://github.com/pmoracho/menu-rs"
 description = "Un menu interactivo y configurable para terminales"
 
+[package.metadata.wix]
+upgrade-guid = "1636E04D-C2BA-4840-B4A5-17AC7A9F5B99"
+path-guid = "7A1C5B68-8360-47E4-BADE-18919DBBE73F"
+license = false
+eula = false
+
 [dependencies]
 ratatui = "0.30.0"
 crossterm = "0.28"
 clap = { version = "4.4", features = ["derive"] }
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
