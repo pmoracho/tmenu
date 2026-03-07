@@ -1,4 +1,11 @@
+# Menu de opciones para proyecto Rust
+# [Ctrl+q] Salir
+# [tab] Buscar
+# [<-|->] Navegar
 "Rust Project":
+  Información:
+    "Versión de cargo": cargo --version
+    "Versión de rust": rustc --version
   Desarrollo:
     Ejecutar: cargo run
     Compilar: cargo build
@@ -21,4 +28,5 @@
   Limpieza:
     Clean: cargo clean
     "Reset Cargo": cargo clean && cargo update
+    # Eliminar el lock file
     "Eliminar Lockfile": rm Cargo.lock

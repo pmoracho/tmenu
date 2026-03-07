@@ -1,3 +1,15 @@
+/// Lector de menús interactivos TUI en Rust utilizando Ratatui y Clap
+/// Este programa carga un menú desde un falso archivo .toon
+/// El formato del archivo es simple, con títulos, comandos y submenús definidos por indentación.
+/// El programa permite navegar por el menú, ejecutar comandos y volver atrás en submenús.
+/// Ejemplo de formato .toon:
+/// Menu Principal:
+///     "Item 1": "echo 'Comando 1 ejecutado'"
+///     "Item 2": "echo 'Comando 2 ejecutado'"
+///     Submenú:
+///         "Subitem 1": "echo 'Subcomando 1 ejecutado'"
+///         "Subitem 2": "echo 'Subcomando 2 ejecutado'"
+///     "Salir": "exit"
 use ratatui::{
     Frame, Terminal,
     backend::{Backend, CrosstermBackend},
@@ -47,6 +59,8 @@ struct App {
     current_title: String,
     current_items: Vec<MenuItem>,
     state: ListState,
+    search_text: String,
+    search_mode: bool,
 }
 
 /// Implementación de la lógica principal de la aplicación, incluyendo la carga del menú desde un archivo,
@@ -61,75 +75,7 @@ impl App {
     fn current_data(&self) -> (&String, &Vec<MenuItem>) {
         (&self.current_title, &self.current_items)
     }
-    /// Carga el menú desde un archivo .toon, parseando su contenido para construir la estructura de menú en memoria.
-    /// - `path`: Ruta al archivo .toon que contiene la definición del menú.
-    /// Devuelve una instancia de App con el menú cargado y listo para ser utilizado en
-    /// la aplicación. El método maneja posibles errores de lectura y parseo, devolviendo un error si el
-    /// archivo no se puede leer o si su formato no es válido. El formato esperado del archivo .toon
-    /// incluye líneas que definen títulos de menú, submenús y comandos asociados a cada item,
-    /// permitiendo una estructura jerárquica de menú con múltiples niveles de submenús
-    // fn from_toon(path: &str) -> Result<Self, Box<dyn Error>> {
-    //     let content = fs::read_to_string(path)?;
-    //     let mut root_items: Vec<MenuItem> = Vec::new();
-    //     let mut current_submenu: Option<(String, Vec<MenuItem>)> = None;
-    //     let mut main_title = String::from("Menu Principal"); // Valor por defecto
-    //     let mut first_key_found = false;
 
-    //     for line in content.lines() {
-    //         if line.trim().is_empty() { continue; }
-
-    //         let indent = line.len() - line.trim_start().len();
-    //         let trimmed = line.trim();
-
-    //         if trimmed.ends_with(':') && indent == 0 {
-    //             // Capturamos la primera clave global como título del menú
-    //             if !first_key_found {
-    //                 main_title = trimmed.trim_matches(':').trim_matches('"').to_string();
-    //                 first_key_found = true;
-    //             }
-    //         } else if trimmed.ends_with(':') && indent > 0 {
-    //             // Inicio de un submenú
-    //             let name = trimmed.trim_matches(':').trim_matches('"').to_string();
-    //             current_submenu = Some((name, Vec::new()));
-    //         } else if trimmed.contains('[') {
-    //             // Es un item: "Nombre"[2]: comando...
-    //             let parts: Vec<&str> = trimmed.split("]:").collect();
-    //             let label = parts[0].split('[').next().unwrap().trim_matches('"').to_string();
-    //             let action_str = parts.get(1).unwrap_or(&"").trim().to_string();
-
-    //             let item = MenuItem {
-    //                 label,
-    //                 action: MenuAction::Execute(action_str),
-    //             };
-
-    //             if indent > 2 {
-    //                 if let Some(ref mut sub) = current_submenu {
-    //                     sub.1.push(item);
-    //                 }
-    //             } else {
-    //                 root_items.push(item);
-    //             }
-    //         }
-    //     }
-
-    //     // Agregar el último submenú procesado a los items raíz
-    //     if let Some((name, sub_items)) = current_submenu {
-    //         root_items.push(MenuItem {
-    //             label: name,
-    //             action: MenuAction::OpenSubmenu(sub_items),
-    //         });
-    //     }
-
-    //     let mut state = ListState::default();
-    //     state.select(Some(0));
-
-    //     Ok(App {
-    //         history: Vec::new(),
-    //         current_title: main_title, // Usamos el título capturado
-    //         current_items: root_items,
-    //         state,
-    //     })
-    // }
     fn from_toon(path: &str) -> Result<Self, Box<dyn Error>> {
         let content = fs::read_to_string(path)?;
         let mut main_title = String::from("Menu Principal");
@@ -199,6 +145,8 @@ impl App {
             current_title: main_title,
             current_items: root_items,
             state,
+            search_text: String::new(),
+            search_mode: false,
         })
     }
 
@@ -217,6 +165,21 @@ impl App {
         }
     }
 
+    /// Función para volver al menú raíz, limpiando el historial y restaurando el estado inicial del menú.
+    fn go_home(&mut self) {
+        if !self.history.is_empty() {
+            // El primer elemento del historial es el estado del menú raíz
+            let (root_title, root_items, root_state) = self.history.remove(0);
+
+            // Limpiamos el resto del historial
+            self.history.clear();
+
+            // Restauramos los valores raíz
+            self.current_title = root_title;
+            self.current_items = root_items;
+            self.state = root_state;
+        }
+    }
     fn next(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
@@ -319,6 +282,89 @@ impl App {
             self.state = state;
         }
     }
+
+    fn filter_recursive(items: &[MenuItem], query: &str) -> Vec<MenuItem> {
+        let mut results = Vec::new();
+        for item in items {
+            match &item.action {
+                MenuAction::Execute(_) => {
+                    if is_fuzzy_match(&item.label, query) {
+                        results.push(item.clone());
+                    }
+                }
+                MenuAction::OpenSubmenu(sub_items) => {
+                    results.append(&mut Self::filter_recursive(sub_items, query));
+                }
+            }
+        }
+        results
+    }
+
+    // Busca el primer comando disponible (para el caso de "lista vacía")
+    fn find_first_command(items: &[MenuItem]) -> Option<MenuItem> {
+        for item in items {
+            match &item.action {
+                MenuAction::Execute(_) => return Some(item.clone()),
+                MenuAction::OpenSubmenu(sub_items) => {
+                    if let Some(found) = Self::find_first_command(sub_items) {
+                        return Some(found);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn filtered_items(&self) -> Vec<MenuItem> {
+        if !self.search_mode || self.search_text.is_empty() {
+            return self.current_items.clone();
+        }
+
+        let mut results = Self::filter_recursive(&self.current_items, &self.search_text);
+
+        if results.is_empty() {
+            // Si no hay match, buscamos el primer comando que exista en el menú actual
+            if let Some(fallback) = Self::find_first_command(&self.current_items) {
+                results.push(fallback);
+            }
+        }
+        results
+    }
+
+    fn enter_with_list<B: Backend>(
+        &mut self,
+        terminal: &mut Terminal<B>,
+        list: &[MenuItem],
+    ) -> bool {
+        if let Some(index) = self.state.selected() {
+            if let Some(item) = list.get(index) {
+                match &item.action {
+                    MenuAction::Execute(cmd_str) => {
+                        let clean_cmd = cmd_str.trim().trim_matches('"');
+                        if clean_cmd == "exit" {
+                            return true;
+                        }
+                        self.execute_external_command(terminal, clean_cmd);
+                    }
+                    MenuAction::OpenSubmenu(sub_items) => {
+                        // Si el filtro devolvió un submenú, entramos en él
+                        self.search_text.clear();
+                        self.search_mode = false;
+                        self.history.push((
+                            self.current_title.clone(),
+                            self.current_items.clone(),
+                            self.state.clone(),
+                        ));
+                        self.current_title = item.label.clone();
+                        self.current_items = sub_items.clone();
+                        self.state = ListState::default();
+                        self.state.select(Some(0));
+                    }
+                }
+            }
+        }
+        false
+    }
 }
 
 /// Función principal que inicializa la aplicación, configura la terminal y maneja el ciclo de eventos.
@@ -345,10 +391,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Configuración de la terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
+    execute!(stdout, crossterm::cursor::SetCursorStyle::SteadyUnderScore)?;
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
-
     let res = run_app(&mut terminal, &mut app);
 
     // Restaurar terminal
@@ -385,17 +431,53 @@ where
 
         if let Event::Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Press {
-                match key.code {
-                    KeyCode::Char('q') => return Ok(()),
-                    KeyCode::Down => app.next(),
-                    KeyCode::Up => app.previous(),
-                    KeyCode::Enter | KeyCode::Right => {
-                        if app.enter(terminal) {
-                            return Ok(());
+                if key.modifiers.contains(event::KeyModifiers::CONTROL)
+                    && key.code == KeyCode::Char('q')
+                {
+                    return Ok(()); // Salir de la aplicación
+                }
+                if app.search_mode {
+                    // --- MODO EDICIÓN ACTIVO ---
+                    match key.code {
+                        KeyCode::Tab => {
+                            app.search_mode = false; // Salir del modo edición
+                            app.search_text.clear();
                         }
+                        KeyCode::Backspace => {
+                            app.search_text.pop();
+                        }
+                        KeyCode::Enter => {
+                            let filtered = app.filtered_items();
+                            if !filtered.is_empty() {
+                                // Seleccionamos el primero y ejecutamos
+                                app.state.select(Some(0));
+                                if app.enter_with_list(terminal, &filtered) {
+                                    return Ok(());
+                                }
+                            }
+                        }
+                        KeyCode::Char(c) => {
+                            app.search_text.push(c);
+                        }
+                        _ => {}
                     }
-                    KeyCode::Left | KeyCode::Esc => app.back(),
-                    _ => {}
+                } else {
+                    // --- MODO NAVEGACIÓN (Normal) ---
+                    match key.code {
+                        KeyCode::Tab => {
+                            app.search_mode = true; // Activar con tecla '/' o 's'
+                        }
+                        KeyCode::Down => app.next(),
+                        KeyCode::Up => app.previous(),
+                        KeyCode::Home => app.go_home(),
+                        KeyCode::Enter | KeyCode::Right => {
+                            if app.enter(terminal) {
+                                return Ok(());
+                            }
+                        }
+                        KeyCode::Left | KeyCode::Esc => app.back(),
+                        _ => {}
+                    }
                 }
             }
         }
@@ -413,6 +495,20 @@ where
 ///   5. Construir los widgets de lista
 ///   6. Renderizar el widget de lista con estilos personalizados, incluyendo colores y símbolos para indicar submenús.
 fn ui(f: &mut Frame, app: &mut App) {
+    let items_to_render = app.filtered_items();
+    let current_selected = app.state.selected().unwrap_or(0);
+    if !items_to_render.is_empty() && current_selected >= items_to_render.len() {
+        app.state.select(Some(0));
+    }
+
+    // Definir color basado en el modo
+    let input_color = if app.search_mode {
+        Color::Yellow
+    } else {
+        Color::DarkGray
+    };
+    let input_title = if app.search_mode { " Buscar ... " } else { "" };
+
     // Dibujar un fondo tenue (opcional)
     let background_block = Block::default().style(Style::default().bg(Color::Reset));
     f.render_widget(background_block, f.area());
@@ -431,19 +527,26 @@ fn ui(f: &mut Frame, app: &mut App) {
     // 3. Área centrada con espacio extra para el padding interno
     let area = auto_size_rect(
         (max_w + 14) as u16,
-        (items_to_show.len() + 4) as u16,
+        (items_to_show.len() + 6) as u16,
         f.area(),
     );
 
+    let chunks = ratatui::layout::Layout::default()
+        .direction(ratatui::layout::Direction::Vertical)
+        .constraints([
+            ratatui::layout::Constraint::Min(3),    // Lista (crece)
+            ratatui::layout::Constraint::Length(3), // Input (fijo)
+        ])
+        .split(area);
+
     // 4. Creamos los ListItems con el nuevo estilo
-    let items: Vec<ListItem> = items_to_show
+    let items: Vec<ListItem> = items_to_render
         .iter()
         .map(|i| {
             let symbol = match i.action {
-                MenuAction::OpenSubmenu(_) => " ", // O ">" si no tienes NerdFonts
+                MenuAction::OpenSubmenu(_) => " ",
                 _ => "",
             };
-            // Agregamos un poco de espacio a la izquierda del texto
             ListItem::new(format!(" {}{}", i.label, symbol))
         })
         .collect();
@@ -460,7 +563,7 @@ fn ui(f: &mut Frame, app: &mut App) {
             Block::default()
                 .title(format!(" {} ", title))
                 .title_alignment(ratatui::layout::Alignment::Center)
-                .title_bottom(Line::from("[q] Salir | [←] Volver").right_aligned())
+                .title_bottom(Line::from("[Ctrl+q] Salir").right_aligned())
                 .borders(Borders::ALL)
                 .border_type(ratatui::widgets::BorderType::Rounded)
                 .border_style(Style::default().fg(border_color))
@@ -475,17 +578,55 @@ fn ui(f: &mut Frame, app: &mut App) {
         .highlight_symbol(" ➔ ");
 
     // Renderizado final
-    f.render_stateful_widget(list, area, &mut app.state);
+    f.render_stateful_widget(list, chunks[0], &mut app.state);
+
+    // 2. RENDERIZAR INPUT (en chunks[1])
+    if app.search_mode {
+        let input_panel = ratatui::widgets::Paragraph::new(app.search_text.as_str()).block(
+            Block::default()
+                .title(input_title)
+                .borders(Borders::ALL)
+                .border_type(ratatui::widgets::BorderType::Rounded)
+                .border_style(Style::default().fg(input_color)), // Color dinámico
+        );
+        f.set_cursor_position((
+            chunks[1].x + app.search_text.len() as u16 + 1,
+            chunks[1].y + 1,
+        ));
+        f.render_widget(input_panel, chunks[1]);
+    }
 }
 
-/// Calcula un Rect centrado con un tamaño máximo dado por width y height, pero sin exceder el tamaño del rectángulo original (r).
-/// Si el tamaño calculado es menor que el del rectángulo original, se centra dentro de él.
+/// Calcula un Rect centrado con un tamaño máximo dado por width y height,
+/// pero sin exceder el tamaño del rectángulo original (r).
+/// Si el tamaño calculado es menor que el del rectángulo original, se
+/// centra dentro de él.
+///
 /// - `width`: Ancho máximo deseado para el nuevo rectángulo.
 /// - `height`: Alto máximo deseado para el nuevo rectángulo.
 /// - `r`: Rectángulo original que define el área total disponible.
+///
 /// Devuelve un nuevo Rect que es el resultado de aplicar las restricciones de tamaño y centrado.
 fn auto_size_rect(width: u16, height: u16, r: Rect) -> Rect {
     let w = width.min(r.width);
     let h = height.min(r.height);
     Rect::new((r.width - w) / 2, (r.height - h) / 2, w, h)
+}
+
+/// Función de comparación difusa (fuzzy match) que verifica si el texto contiene los caracteres del query
+/// en el mismo orden, pero no necesariamente de forma contigua. La comparación es insensible a mayúsculas y minúsculas.
+/// - `text`: El texto completo que se va a comparar.
+/// - `query`: La cadena de búsqueda que se desea encontrar dentro del texto.
+///
+/// Devuelve `true` si el texto contiene los caracteres del query en el mismo orden
+///
+fn is_fuzzy_match(text: &str, query: &str) -> bool {
+    let mut it = text.chars();
+    for c in query.chars() {
+        match it.find(|&x| x.to_lowercase().next() == c.to_lowercase().next()) {
+            Some(_) => (),
+            None => return false,
+        }
+    }
+    true
 }
