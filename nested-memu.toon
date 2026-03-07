@@ -1,0 +1,27 @@
+"Prueba de un menu super anidado con 25 niveles de profundidad":
+  "Nivel 1":
+    "Nivel 2":
+      "Nivel 3":
+        "Nivel 4":
+          "Nivel 5":
+            "Nivel 6":
+              "Nivel 7":
+                "Nivel 8":
+                  "Nivel 9":
+                    "Nivel 10":
+                      "Nivel 11":
+                        "Nivel 12":
+                          "Nivel 13":
+                            "Nivel 14":
+                              "Nivel 15":
+                                "Nivel 16":
+                                  "Nivel 17":
+                                    "Nivel 18":
+                                      "Nivel 19":
+                                        "Nivel 20":
+                                          "Nivel 21":
+                                            "Nivel 22":
+                                              "Nivel 23":
+                                                "Nivel 24":
+                                                  "Nivel 25":
+                                                    "Item final":  echo '¡Has llegado al final del menú anidado!'
