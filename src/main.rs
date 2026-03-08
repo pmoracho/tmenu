@@ -26,7 +26,6 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use std::path::PathBuf;
-#[cfg(not(target_os = "windows"))]
 use std::process::Command;
 use std::{error::Error, fs, io};
 
