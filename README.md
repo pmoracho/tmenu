@@ -6,6 +6,10 @@ Características principales
 - Menú ligero y rápido para la terminal.
 - Configuración vía archivo `tmenu.toon` (ubicado en el repositorio).
 
+![Menu estándar](images/tmenu-1.png)
+
+![Con {tab} se puede buscar](images/temnu-2.png)
+
 Requisitos
 - Rust (toolchain estable) y `cargo` instalados.
 
