@@ -1,6 +1,6 @@
 "Prueba de un menu super anidado con 25 niveles de profundidad":
-  "Nivel 1":
-    "Nivel 2":
+  "Nivel 1": 
+    "Nivel 2": 
       "Nivel 3":
         "Nivel 4":
           "Nivel 5":
