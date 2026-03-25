@@ -1,0 +1,64 @@
+# Menu de opciones para Git
+# [Ctrl+q] Salir
+# [tab] Buscar
+# [<-|->] Navegar
+"Git":
+  Repositorio:
+    "Inicializar repo": git init
+    "Ver estado": git status
+    "Ver log (compacto)": git log --oneline --graph --decorate
+    "Ver log completo": git log
+    "Ver ramas": git branch -a
+    "Ver remotos": git remote -v
+  "Staging y Commits":
+    "Agregar todo": git add .
+    "Agregar interactivo": git add -p
+    "Commit": git commit
+    "Commit con mensaje": git commit -m "WIP"
+    "Commit enmendado": git commit --amend --no-edit
+    "Ver diff staged": git diff --staged
+    "Ver diff working": git diff
+  "Ramas":
+    "Nueva rama": git checkout -b nueva-rama
+    "Cambiar rama": git checkout -
+    "Eliminar rama local": git branch -d nueva-rama
+    "Renombrar rama": git branch -m nuevo-nombre
+    "Listar ramas remotas": git branch -r
+  "Sincronización":
+    "Fetch": git fetch --all --prune
+    "Pull": git pull
+    "Pull rebase": git pull --rebase
+    "Push": git push
+    "Push forzado (seguro)": git push --force-with-lease
+    "Push nueva rama": git push -u origin HEAD
+  "Merge y Rebase":
+    "Merge rama": git merge
+    "Rebase interactivo": git rebase -i HEAD~5
+    "Abortar rebase": git rebase --abort
+    "Continuar rebase": git rebase --continue
+    "Abortar merge": git merge --abort
+  "Stash":
+    "Guardar stash": git stash push -m "wip"
+    "Ver stashes": git stash list
+    "Aplicar último stash": git stash pop
+    "Aplicar sin eliminar": git stash apply
+    "Eliminar último stash": git stash drop
+    "Limpiar stashes": git stash clear
+  "Deshacer":
+    "Deshacer último commit (soft)": git reset --soft HEAD~1
+    "Deshacer último commit (hard)": git reset --hard HEAD~1
+    "Revertir commit": git revert HEAD
+    "Restaurar archivo": git checkout -- .
+    "Limpiar archivos no trackeados": git clean -fd
+  "Etiquetas":
+    "Nueva tag": git tag v0.1.0
+    "Nueva tag anotada": git tag -a v0.1.0 -m "Release v0.1.0"
+    "Listar tags": git tag -l
+    "Subir tags": git push --tags
+    "Eliminar tag local": git tag -d v0.1.0
+  Configuración:
+    "Ver config global": git config --global --list
+    "Ver config local": git config --local --list
+    "Editor por defecto": git config --global core.editor vim
+    "Nombre de usuario": git config --global user.name
+    "Email de usuario": git config --global user.email
