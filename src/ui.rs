@@ -52,8 +52,15 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         ])
         .split(area);
 
-    render_menu_list(f, app, &items_to_render, chunks[0], &title);
+    let menu_area = chunks[0];
+    render_menu_list(f, app, &items_to_render, menu_area, &title);
     render_search_bar(f, app, chunks[1]);
+    
+    if app.show_help {
+        render_help_modal(f);
+    } else {
+        render_preview_popup(f, app, &items_to_render, menu_area);
+    }    
 }
 
 /// Renderiza la lista de items del menu.
@@ -84,7 +91,7 @@ fn render_menu_list(
     let depth_hint = if app.history.is_empty() {
         String::from("[Ctrl+q] Salir")
     } else {
-        format!("[Esc] Volver  [Ctrl+q] Salir  (nivel {})", app.history.len())
+        String::from("[<-] Volver [Ctrl+q] Salir")
     };
 
     let list = List::new(list_items)
@@ -130,6 +137,119 @@ fn render_search_bar(f: &mut Frame, app: &App, area: Rect) {
         .saturating_add(1);
     f.set_cursor_position((cursor_x, area.y + 1));
     f.render_widget(input_panel, area);
+}
+
+fn render_preview_popup(
+    f: &mut Frame,
+    app: &App,
+    items: &[crate::model::MenuItem],
+    menu_area: Rect,
+) {
+    use ratatui::widgets::Clear;
+
+    if !app.show_preview {
+        return;
+    }
+
+    let cmd_text = app
+        .state
+        .selected()
+        .and_then(|i| items.get(i))
+        .map(|item| match &item.action {
+            MenuAction::Execute(cmd) => format!("$ {}", cmd),
+            MenuAction::OpenSubmenu(_) => String::from("(submenú)"),
+        })
+        .unwrap_or_else(|| String::from("(sin selección)"));
+
+    let screen = f.area();
+    let popup_w = (cmd_text.chars().count() as u16 + 6)
+        .max(24)
+        .min(screen.width.saturating_sub(4));
+    let popup_h: u16 = 3; // borde top + 1 línea de texto + borde bottom
+
+    // Fila Y del ítem seleccionado en coordenadas de terminal:
+    //   +1 borde superior, +1 padding top, +1 margen interno del bloque
+    let index = app.state.selected().unwrap_or(0) as u16;
+    let item_y = menu_area.y + 1 + 1 + 1 + index;
+
+    // Intentar colocar debajo; si no entra, colocar encima
+    let popup_y = if item_y + 1 + popup_h <= screen.height {
+        item_y + 0
+    } else {
+        item_y.saturating_sub(popup_h)
+    };
+
+    // Alinear horizontalmente con el menú, sin salirse de pantalla
+    let popup_x = menu_area.x.min(screen.width.saturating_sub(popup_w)) + 5;
+
+    let popup_area = Rect::new(popup_x, popup_y, popup_w, popup_h);
+
+    f.render_widget(Clear, popup_area);
+    let popup = Paragraph::new(cmd_text)
+        .block(
+            Block::default()
+                .title(" Comando a ejecutar ")
+                .title_alignment(Alignment::Center)
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::Green))
+                .padding(Padding::new(1, 1, 0, 0)),
+        )
+        .style(Style::default().fg(Color::White));
+
+    f.render_widget(popup, popup_area);
+}
+
+/// Ventana de ayuda bloqueante con todos los atajos de teclado.
+fn render_help_modal(f: &mut Frame) {
+    use ratatui::{text::Span, widgets::{Clear, Table, Row, Cell}};
+
+    let shortcuts: &[(&str, &str)] = &[
+        ("↑ / ↓",       "Navegar ítems"),
+        ("Enter / →",   "Seleccionar / entrar al submenú"),
+        ("Esc / ←",     "Volver al menú anterior"),
+        ("Inicio",      "Ir al menú raíz"),
+        ("Tab",         "Activar búsqueda"),
+        ("Tab (busq.)", "Salir de búsqueda"),
+        ("Ctrl+Q",      "Salir de la aplicación"),
+        ("F2",          "Mostrar / ocultar vista previa"),
+        ("F1",          "Mostrar / cerrar esta ayuda"),
+    ];
+
+    let rows: Vec<Row> = shortcuts
+        .iter()
+        .map(|(key, desc)| {
+            Row::new(vec![
+                Cell::from(Span::styled(
+                    format!(" {:‣<1} {} ", "", key),  // padding visual
+                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                )),
+                Cell::from(Span::raw(format!(" {} ", desc))),
+            ])
+        })
+        .collect();
+
+    let table = Table::new(
+        rows,
+        [Constraint::Length(18), Constraint::Min(28)],
+    )
+    .block(
+        Block::default()
+            .title(" Ayuda — Atajos de teclado ")
+            .title_alignment(Alignment::Center)
+            .title_bottom(Line::from(" [Esc] [F1] Cerrar ").right_aligned())
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(Color::Cyan)),
+    )
+    .column_spacing(1);
+
+    let popup_w: u16 = 60;
+    let popup_h: u16 = shortcuts.len() as u16 + 2; // filas + bordes + padding
+    let area = centered_rect(popup_w, popup_h, f.area());
+
+    f.render_widget(Clear, area);
+    f.render_widget(table, area);
 }
 
 /// Calcula un Rect centrado dentro de `r` con el tamano indicado,

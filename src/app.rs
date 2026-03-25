@@ -16,20 +16,16 @@ use crate::model::{HistoryEntry, MenuAction, MenuItem};
 use crate::parser::parse_toon_file;
 use crate::search::{filter_recursive, find_first_command};
 
-/// Caracteres de shell que no se permiten en comandos del archivo `.toon`
-/// para prevenir inyección de comandos.
-const FORBIDDEN_CHARS: &[char] = &['`', '$', '|', '&', ';', '>', '<', '(', ')'];
-
 /// Estado principal de la aplicación TUI.
 pub struct App {
-    /// Historial de navegación para poder retroceder niveles.
     pub history: Vec<HistoryEntry>,
     pub current_title: String,
     pub current_items: Vec<MenuItem>,
     pub state: ListState,
     pub search_text: String,
     pub search_mode: bool,
-    /// Activa mensajes de depuración en stderr.
+    pub show_preview: bool, 
+    pub show_help: bool,
     pub debug: bool,
 }
 
@@ -48,6 +44,8 @@ impl App {
             state,
             search_text: String::new(),
             search_mode: false,
+            show_preview: false,
+            show_help: false,
             debug,
         })
     }
@@ -103,11 +101,14 @@ impl App {
 
     /// Vuelve directamente al menú raíz, limpiando todo el historial.
     pub fn go_home(&mut self) {
-        if let Some(root) = self.history.drain(..).next() {
-            self.current_title = root.title;
-            self.current_items = root.items;
-            self.state = root.state;
+        if self.history.is_empty() {
+            return;
         }
+        // El root es el primer elemento guardado
+        let root = self.history.drain(..).next().unwrap();
+        self.current_title = root.title;
+        self.current_items = root.items;
+        self.state = root.state;
     }
 
     /// Guarda el estado actual en el historial antes de navegar a un submenú.
@@ -168,8 +169,8 @@ impl App {
         cmd: &str,
     ) -> Result<(), AppError> {
         // Validar caracteres peligrosos
-        if let Some(c) = cmd.chars().find(|c| FORBIDDEN_CHARS.contains(c)) {
-            return Err(AppError::ForbiddenCommand(c.to_string()));
+        if !Self::is_safe_command(cmd) {
+            return Err(AppError::ForbiddenCommand(cmd.to_string()));
         }
 
         if self.debug {
@@ -188,13 +189,15 @@ impl App {
         #[cfg(target_os = "windows")]
         let status = Command::new("cmd").args(["/C", cmd]).spawn();
         #[cfg(not(target_os = "windows"))]
-        let status = Command::new("sh").args(["-c", cmd]).spawn();
-
-        match status {
-            Ok(mut child) => {
-                let _ = child.wait();
+        let parts: Vec<&str> = cmd.split_whitespace().collect();
+        if let Some((bin, args)) = parts.split_first() {
+            let status = Command::new(bin).args(args).spawn();
+            match status {
+                Ok(mut child) => {
+                    let _ = child.wait();
+                }
+                Err(e) => eprintln!("[error] no se pudo ejecutar el comando: {}", e),
             }
-            Err(e) => eprintln!("[error] no se pudo ejecutar el comando: {}", e),
         }
 
         println!("\nPresioná Enter para volver...");
@@ -213,4 +216,11 @@ impl App {
 
         Ok(())
     }
+
+    fn is_safe_command(cmd: &str) -> bool {
+    cmd.chars().all(|c| matches!(c,
+        'a'..='z' | 'A'..='Z' | '0'..='9'
+        | ' ' | '.' | '/' | '_' | '-' | '='
+    ))
+}
 }

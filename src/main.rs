@@ -37,13 +37,21 @@ struct Args {
 }
 
 fn main() -> Result<(), AppError> {
+    // registrar un hook de pánico:
+    let original_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let _ = disable_raw_mode();
+        let _ = execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture);
+        original_hook(info);
+    }));    
     let args = Args::parse();
 
-    if !args.menu_file.exists() {
-        return Err(AppError::MenuFileNotFound(args.menu_file));
-    }
-
-    let mut app = App::from_toon(&args.menu_file, args.debug)?;
+    let mut app = App::from_toon(&args.menu_file, args.debug)
+        .map_err(|e| match e {
+            AppError::IoError(ref io) if io.kind() == io::ErrorKind::NotFound =>
+                AppError::MenuFileNotFound(args.menu_file.clone()),
+            other => other,
+        })?;
 
     enable_raw_mode().map_err(|e| AppError::TerminalError(e.to_string()))?;
     let mut stdout = io::stdout();
@@ -86,7 +94,14 @@ fn run_app(
             if key.kind != event::KeyEventKind::Press {
                 continue;
             }
-
+            if key.code == KeyCode::F(1) {
+                app.show_help = true;
+                let quit = run_help_modal(terminal, app)?;  // ← ahora retorna bool
+                if quit {
+                    return Ok(());
+                }
+                continue;
+            }
             // Ctrl+Q sale desde cualquier modo
             if key.modifiers.contains(event::KeyModifiers::CONTROL)
                 && key.code == KeyCode::Char('q')
@@ -108,6 +123,38 @@ fn run_app(
     }
 }
 
+// run_help_modal retorna true si el usuario pidió salir
+fn run_help_modal(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    app: &mut App,
+) -> Result<bool, AppError> {
+    loop {
+        terminal
+            .draw(|f| ui::ui(f, app))
+            .map_err(|e| AppError::TerminalError(e.to_string()))?;
+
+        if let Event::Key(key) = event::read()
+            .map_err(|e| AppError::EventError(e.to_string()))?
+        {
+            if key.kind != event::KeyEventKind::Press {
+                continue;
+            }
+            match key.code {
+                KeyCode::Esc | KeyCode::F(1) | KeyCode::F(2) => {
+                    app.show_help = false;
+                    return Ok(false); // cerrar ayuda, continuar app
+                }
+                KeyCode::Char('q')
+                    if key.modifiers.contains(event::KeyModifiers::CONTROL) =>
+                {
+                    return Ok(true); // salir de la app
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
 /// Maneja teclas en modo busqueda.
 /// Recibe el KeyCode ya leido por el loop — sin segundo event::read().
 fn handle_search_mode(
@@ -123,6 +170,7 @@ fn handle_search_mode(
         KeyCode::Backspace => {
             app.search_text.pop();
         }
+        KeyCode::F(2) => app.show_preview = !app.show_preview,
         KeyCode::Enter => {
             let filtered = app.filtered_items();
             if !filtered.is_empty() {
@@ -151,6 +199,7 @@ fn handle_navigation_mode(
         KeyCode::Down => app.next(),
         KeyCode::Up => app.previous(),
         KeyCode::Home => app.go_home(),
+        KeyCode::F(2) => app.show_preview = !app.show_preview,
         KeyCode::Enter | KeyCode::Right => {
             let items = app.filtered_items();
             if app.activate_item(terminal, &items)? {
