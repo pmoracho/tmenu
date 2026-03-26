@@ -24,4 +24,4 @@
                                               "Nivel 23":
                                                 "Nivel 24":
                                                   "Nivel 25":
-                                                    "Item final":  echo '¡Has llegado al final del menú anidado!'
+                                                    "Item final":  echo {{text: Ingrese el mesaje}}

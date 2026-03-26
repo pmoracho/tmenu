@@ -11,8 +11,8 @@ use crossterm::{
 use std::io;
 use std::process::Command;
 
-use crate::error::AppError;
-use crate::model::{HistoryEntry, MenuAction, MenuItem};
+use crate::{error::AppError, parser};
+use crate::model::{HistoryEntry, MenuAction, MenuItem, CommandParam};
 use crate::parser::parse_toon_file;
 use crate::search::{filter_recursive, find_first_command};
 
@@ -27,6 +27,7 @@ pub struct App {
     pub show_preview: bool, 
     pub show_help: bool,
     pub debug: bool,
+    pub wizard: Option<WizardState>,
 }
 
 impl App {
@@ -47,6 +48,7 @@ impl App {
             show_preview: false,
             show_help: false,
             debug,
+            wizard: None,
         })
     }
 
@@ -140,7 +142,15 @@ impl App {
                 if cmd == "exit" {
                     return Ok(true);
                 }
-                self.execute_external_command(terminal, cmd)?;
+
+                let params = parser::extract_params(cmd);
+                if params.is_empty() {
+                    // Sin interpolación: ejecutar directo como antes
+                    self.execute_external_command(terminal, cmd)?;
+                } else {
+                    // Con interpolación: iniciar wizard (no ejecutar todavía)
+                    self.wizard = Some(WizardState::new(params, cmd.to_string()));
+                }
             }
             MenuAction::OpenSubmenu(sub_items) => {
                 self.search_text.clear();
@@ -217,10 +227,77 @@ impl App {
         Ok(())
     }
 
+    /// Ejecuta el comando resuelto y limpia el wizard.
+    pub fn finish_wizard<B: Backend>(
+        &mut self,
+        terminal: &mut Terminal<B>,
+    ) -> Result<bool, AppError> {
+        if let Some(ref wizard) = self.wizard {
+            let cmd = wizard.resolve();
+            self.wizard = None;
+            self.execute_external_command(terminal, &cmd)?;
+        }
+        Ok(false)
+    }    
+
     fn is_safe_command(cmd: &str) -> bool {
     cmd.chars().all(|c| matches!(c,
         'a'..='z' | 'A'..='Z' | '0'..='9'
         | ' ' | '.' | '/' | '_' | '-' | '='
     ))
 }
+}
+
+/// Estado del wizard de interpolación de parámetros.
+pub struct WizardState {
+    /// Parámetros a completar, en orden.
+    pub params: Vec<CommandParam>,
+    /// Índice del parámetro actual.
+    pub current: usize,
+    /// Valores ingresados hasta ahora (mismo orden que `params`).
+    pub values: Vec<String>,
+    /// Texto que el usuario está escribiendo ahora mismo.
+    pub input: String,
+    /// Comando original con placeholders sin reemplazar.
+    pub original_cmd: String,
+}
+
+impl WizardState {
+    pub fn new(params: Vec<CommandParam>, cmd: String) -> Self {
+        let len = params.len();
+        WizardState {
+            params,
+            current: 0,
+            values: vec![String::new(); len],
+            input: String::new(),
+            original_cmd: cmd,
+        }
+    }
+
+    /// Parámetro que se está pidiendo ahora.
+    pub fn current_param(&self) -> &CommandParam {
+        &self.params[self.current]
+    }
+
+    /// Confirma el campo actual y avanza. Retorna `true` si era el último.
+    pub fn confirm_current(&mut self) -> bool {
+        self.values[self.current] = self.input.clone();
+        self.input.clear();
+        if self.current + 1 >= self.params.len() {
+            true // wizard completo
+        } else {
+            self.current += 1;
+            false
+        }
+    }
+
+    /// Construye el comando final reemplazando todos los placeholders.
+    pub fn resolve(&self) -> String {
+        let mut cmd = self.original_cmd.clone();
+        for (param, value) in self.params.iter().zip(self.values.iter()) {
+            // replace() reemplaza TODAS las ocurrencias del placeholder
+            cmd = cmd.replace(&param.placeholder, value);
+        }
+        cmd
+    }
 }

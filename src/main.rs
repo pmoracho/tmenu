@@ -115,6 +115,15 @@ fn run_app(
             } else {
                 handle_navigation_mode(terminal, app, key.code)?
             };
+            if app.wizard.is_some() {
+                let quit = run_wizard(terminal, app)?;
+                if quit {
+                    return Ok(());
+                }
+            }                
+
+            // Después de handle_navigation_mode o handle_search_mode:
+
 
             if should_quit {
                 return Ok(());
@@ -148,6 +157,67 @@ fn run_help_modal(
                     if key.modifiers.contains(event::KeyModifiers::CONTROL) =>
                 {
                     return Ok(true); // salir de la app
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+/// Loop bloqueante del wizard de interpolación.
+/// Retorna Ok(true) si el usuario canceló, Ok(false) si completó.
+fn run_wizard(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    app: &mut App,
+) -> Result<bool, AppError> {
+    loop {
+        terminal
+            .draw(|f| ui::ui(f, app))
+            .map_err(|e| AppError::TerminalError(e.to_string()))?;
+
+        if let Event::Key(key) = event::read()
+            .map_err(|e| AppError::EventError(e.to_string()))?
+        {
+            if key.kind != event::KeyEventKind::Press {
+                continue;
+            }
+
+            // Ctrl+Q cancela y sale de la app
+            if key.modifiers.contains(event::KeyModifiers::CONTROL)
+                && key.code == KeyCode::Char('q')
+            {
+                app.wizard = None;
+                return Ok(true); // señal de quit
+            }
+
+            match key.code {
+                KeyCode::Esc => {
+                    // Cancelar: descartar wizard, volver al menú
+                    app.wizard = None;
+                    return Ok(false);
+                }
+                KeyCode::Backspace => {
+                    if let Some(ref mut w) = app.wizard {
+                        w.input.pop();
+                    }
+                }
+                KeyCode::Char(c) => {
+                    if let Some(ref mut w) = app.wizard {
+                        w.input.push(c);
+                    }
+                }
+                KeyCode::Enter => {
+                    let done = app.wizard
+                        .as_mut()
+                        .map(|w| w.confirm_current())
+                        .unwrap_or(true);
+
+                    if done {
+                        // Último campo confirmado: ejecutar
+                        app.finish_wizard(terminal)?;
+                        return Ok(false);
+                    }
+                    // Si no es el último, el loop redibuja con el siguiente campo
                 }
                 _ => {}
             }

@@ -3,6 +3,7 @@ use std::path::Path;
 
 use crate::error::AppError;
 use crate::model::{MenuAction, MenuItem};
+use crate::model::CommandParam;
 
 /// Carga y parsea un archivo `.toon`, retornando el titulo principal
 /// y la lista de items del menu raiz.
@@ -122,4 +123,35 @@ fn pop_and_insert(stack: &mut Vec<(String, Vec<MenuItem>, usize)>, root: &mut Ve
             root.push(submenu);
         }
     }
+}
+
+/// Extrae todos los parámetros únicos `{{text: Etiqueta}}` de un comando.
+/// Si el mismo placeholder aparece más de una vez, se retorna una sola entrada.
+pub fn extract_params(cmd: &str) -> Vec<CommandParam> {
+    let mut seen: Vec<String> = Vec::new();
+    let mut params = Vec::new();
+    let mut rest = cmd;
+
+    while let Some(start) = rest.find("{{") {
+        rest = &rest[start + 2..];
+        if let Some(end) = rest.find("}}") {
+            let inner = rest[..end].trim();
+            rest = &rest[end + 2..];
+
+            // Solo manejar el tipo "text:" por ahora; extensible a otros tipos
+            if let Some(label) = inner.strip_prefix("text:") {
+                let label = label.trim().to_string();
+                let placeholder = format!("{{{{text: {}}}}}", label);
+
+                // Deduplicar: si ya vimos este placeholder, no agregarlo de nuevo
+                if !seen.contains(&placeholder) {
+                    seen.push(placeholder.clone());
+                    params.push(CommandParam { label, placeholder });
+                }
+            }
+        } else {
+            break; // '}}' no encontrado, malformado — ignorar el resto
+        }
+    }
+    params
 }

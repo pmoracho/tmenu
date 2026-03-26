@@ -1,0 +1,94 @@
+# Menu de opciones para Docker y Docker Compose
+# [Ctrl+q] Salir
+# [tab] Buscar
+# [<-|->] Navegar
+"Docker":
+  Imágenes:
+    "Listar imágenes": docker images
+    "Buscar imagen": docker search ubuntu
+    "Descargar imagen": docker pull ubuntu
+    "Eliminar imagen": docker rmi ubuntu
+    "Eliminar imágenes sin uso": docker image prune -f
+    "Eliminar todas las imágenes": docker image prune -a -f
+    "Ver historial de imagen": docker history ubuntu
+    "Inspeccionar imagen": docker inspect ubuntu
+  Contenedores:
+    "Listar contenedores activos": docker ps
+    "Listar todos los contenedores": docker ps -a
+    "Iniciar contenedor": docker start mi-contenedor
+    "Detener contenedor": docker stop mi-contenedor
+    "Reiniciar contenedor": docker restart mi-contenedor
+    "Eliminar contenedor": docker rm mi-contenedor
+    "Eliminar contenedores detenidos": docker container prune -f
+    "Ver logs": docker logs mi-contenedor
+    "Seguir logs": docker logs -f mi-contenedor
+    "Inspeccionar contenedor": docker inspect mi-contenedor
+    "Ver estadísticas": docker stats
+    "Ver procesos del contenedor": docker top mi-contenedor
+  Ejecución:
+    "Correr contenedor interactivo": docker run -it ubuntu bash
+    "Correr en segundo plano": docker run -d ubuntu
+    "Correr con puerto mapeado": docker run -d -p 8080:80 nginx
+    "Correr con volumen": docker run -v ./data:/data ubuntu
+    "Ejecutar comando en contenedor": docker exec -it mi-contenedor bash
+    "Copiar archivo al contenedor": docker cp archivo.txt mi-contenedor:/tmp
+    "Copiar archivo del contenedor": docker cp mi-contenedor:/tmp/archivo.txt .
+  Build:
+    "Build imagen": docker build -t mi-imagen .
+    "Build sin caché": docker build --no-cache -t mi-imagen .
+    "Build con build arg": docker build --build-arg ENV=prod -t mi-imagen .
+    "Ver contexto de build": docker build --dry-run .
+    "Tagear imagen": docker tag mi-imagen mi-imagen:v1.0
+  Registry:
+    "Login Docker Hub": docker login
+    "Logout": docker logout
+    "Push imagen": docker push mi-usuario/mi-imagen
+    "Pull imagen privada": docker pull mi-usuario/mi-imagen
+    "Tagear para registry": docker tag mi-imagen mi-usuario/mi-imagen:latest
+  Redes:
+    "Listar redes": docker network ls
+    "Crear red": docker network create mi-red
+    "Inspeccionar red": docker network inspect mi-red
+    "Conectar contenedor a red": docker network connect mi-red mi-contenedor
+    "Desconectar contenedor": docker network disconnect mi-red mi-contenedor
+    "Eliminar red": docker network rm mi-red
+    "Eliminar redes sin uso": docker network prune -f
+  Volúmenes:
+    "Listar volúmenes": docker volume ls
+    "Crear volumen": docker volume create mi-volumen
+    "Inspeccionar volumen": docker volume inspect mi-volumen
+    "Eliminar volumen": docker volume rm mi-volumen
+    "Eliminar volúmenes sin uso": docker volume prune -f
+  "Limpieza General":
+    "Limpiar todo sin uso": docker system prune -f
+    "Limpiar todo incluyendo volúmenes": docker system prune -a --volumes -f
+    "Ver uso de disco": docker system df
+    "Ver información del sistema": docker system info
+  "Docker Compose":
+    Ciclo:
+      "Levantar servicios": docker compose up -d
+      "Levantar y rebuildar": docker compose up -d --build
+      "Detener servicios": docker compose down
+      "Detener y eliminar volúmenes": docker compose down -v
+      "Reiniciar servicios": docker compose restart
+      "Pausar servicios": docker compose pause
+      "Reanudar servicios": docker compose unpause
+    Estado:
+      "Ver servicios": docker compose ps
+      "Ver logs de todos": docker compose logs
+      "Seguir logs de todos": docker compose logs -f
+      "Ver logs de servicio": docker compose logs -f web
+      "Ver estadísticas": docker compose top
+    Ejecución:
+      "Ejecutar comando en servicio": docker compose exec web bash
+      "Correr servicio puntual": docker compose run --rm web bash
+      "Escalar servicio": docker compose up -d --scale web=3
+    Build:
+      "Build todos los servicios": docker compose build
+      "Build sin caché": docker compose build --no-cache
+      "Build servicio puntual": docker compose build web
+      "Pull imágenes": docker compose pull
+    Configuración:
+      "Ver configuración final": docker compose config
+      "Validar archivo compose": docker compose config -q
+      "Ver variables de entorno": docker compose run --rm web env

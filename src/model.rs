@@ -22,3 +22,13 @@ pub struct HistoryEntry {
     pub items: Vec<MenuItem>,
     pub state: ListState,
 }
+
+/// Un parámetro interpolable extraído de un comando.
+/// Corresponde a una ocurrencia de `{{text: Etiqueta}}` en el string del comando.
+#[derive(Clone, Debug)]
+pub struct CommandParam {
+    /// Texto que se muestra al usuario como prompt ("Branch name").
+    pub label: String,
+    /// Placeholder original completo para hacer el reemplazo ("{{text: Branch name}}").
+    pub placeholder: String,
+}
