@@ -18,7 +18,7 @@ pub fn filter_recursive(items: &[MenuItem], query: &str) -> Vec<MenuItem> {
     let mut results = Vec::new();
     for item in items {
         match &item.action {
-            MenuAction::Execute(_) => {
+            MenuAction::Execute(_) | MenuAction::Quit => {
                 if is_fuzzy_match(&item.label, query) {
                     results.push(item.clone());
                 }
@@ -37,6 +37,7 @@ pub fn find_first_command(items: &[MenuItem]) -> Option<MenuItem> {
     for item in items {
         match &item.action {
             MenuAction::Execute(_) => return Some(item.clone()),
+            MenuAction::Quit => {} // no usar como fallback de búsqueda
             MenuAction::OpenSubmenu(sub_items) => {
                 if let Some(found) = find_first_command(sub_items) {
                     return Some(found);

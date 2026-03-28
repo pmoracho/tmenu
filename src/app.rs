@@ -93,11 +93,14 @@ impl App {
     }
 
     /// Vuelve al menú anterior en el historial.
-    pub fn back(&mut self) {
+    pub fn back(&mut self) -> bool {
         if let Some(entry) = self.history.pop() {
             self.current_title = entry.title;
             self.current_items = entry.items;
             self.state = entry.state;
+            true
+        } else {
+            false
         }
     }
 
@@ -137,6 +140,7 @@ impl App {
         };
 
         match &item.action.clone() {
+            MenuAction::Quit => return Ok(true),
             MenuAction::Execute(cmd_str) => {
                 let cmd = cmd_str.trim().trim_matches('"');
                 if cmd == "exit" {
@@ -226,7 +230,37 @@ impl App {
 
         Ok(())
     }
+    pub fn breadcrumb(&self) -> String {
+        const MAX_WIDTH: usize = 40;
 
+        if self.history.is_empty() {
+            return self.current_title.clone();
+        }
+
+        let root = self.history[0].title.as_str();
+        let current = self.current_title.as_str();
+
+        // Construir la cadena completa y ver si entra
+        let mut parts: Vec<&str> = self.history.iter().map(|e| e.title.as_str()).collect();
+        parts.push(current);
+        let full = parts.join(" › ");
+
+        if full.chars().count() <= MAX_WIDTH {
+            return full;
+        }
+
+        // Truncar: Raíz › .. › Actual
+        let candidate = format!("{} › .. › {}", root, current);
+        if candidate.chars().count() <= MAX_WIDTH {
+            return candidate;
+        }
+
+        // Caso extremo: solo el nivel actual (root o current son muy largos)
+        if current.chars().count() <= MAX_WIDTH {
+            return current.to_string();
+        }
+        current.chars().take(MAX_WIDTH).collect()
+    }  
     /// Ejecuta el comando resuelto y limpia el wizard.
     pub fn finish_wizard<B: Backend>(
         &mut self,
@@ -300,4 +334,5 @@ impl WizardState {
         }
         cmd
     }
+
 }

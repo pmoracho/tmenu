@@ -24,23 +24,22 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     }
 
     // Clonar titulo para liberar el borrow inmutable antes de pasar app como mutable.
-    let title = app.current_title.clone();
+    let title = app.breadcrumb();
 
     // Calcular dimensiones a partir de items_to_render (lo que realmente se dibuja),
     // no de current_items. Usar chars().count() para ancho visual correcto con Unicode.
     let title_w = title.chars().count();
-    let max_label_w = items_to_render
+    // Dimensiones basadas en current_items para que el box no salte al filtrar
+    let max_label_w = app.current_items
         .iter()
         .map(|item| item.label.chars().count())
         .max()
         .unwrap_or(0);
     let max_w = max_label_w.max(title_w);
 
-    // Minimo de ancho razonable para que el menu siempre sea visible
     let box_width = (max_w + 14).max(24) as u16;
-    // +6: bordes (2) + padding top/bottom (2) + hint inferior (1) + margen (1)
-    // minimo de alto para que siempre haya espacio para al menos 1 item
-    let box_height = (items_to_render.len() + 6).max(8) as u16;
+    // Altura fija al máximo del nivel actual (no al filtrado)
+    let box_height = (app.current_items.len() + 7).max(8) as u16;
 
     let area = centered_rect(box_width, box_height, f.area());
 
@@ -76,9 +75,6 @@ fn render_wizard(f: &mut Frame, app: &App) {
 
     // Título con progreso: "Branch name (1/3)"
     let title = format!(" {} ({}/{}) ", param.label, current, total);
-
-    // Hint del comando con el placeholder resaltado (para contexto)
-    let cmd_preview = format!("cmd: {}", wizard.original_cmd);
 
     let input_line = wizard.input.as_str();
 
@@ -133,7 +129,17 @@ fn render_wizard(f: &mut Frame, app: &App) {
     // f.render_widget(cmd_widget, inner[0]);
 
     // Label del campo actual: "Ingrese un nombre:"
-    let label_widget = Paragraph::new(format!("{}:", param.label))
+    let summary: String = wizard.params[..wizard.current]
+        .iter()
+        .zip(wizard.values[..wizard.current].iter())
+        .map(|(p, v)| format!("{}:{} ", p.label, v))
+        .collect();
+    let label_text = if summary.is_empty() {
+        format!("{}:", param.label)
+    } else {
+        format!("{} │ {}:", summary.trim_end(), param.label)
+    };
+    let label_widget = Paragraph::new(label_text)
         .style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD));
     f.render_widget(label_widget, inner[1]);
 
@@ -161,17 +167,14 @@ fn render_menu_list(
     area: Rect,
     title: &str,
 ) {
-    let border_color = if app.history.is_empty() {
-        Color::Cyan    // Menu raiz
-    } else {
-        Color::Magenta // Submenu
-    };
+    let border_color = Color::Cyan;
 
     let list_items: Vec<ListItem> = items_to_render
         .iter()
         .map(|item| {
             let symbol = match item.action {
-                MenuAction::OpenSubmenu(_) => " \u{25b6}", // triangulo indicando submenu
+                MenuAction::OpenSubmenu(_) => " \u{25b6}",
+                MenuAction::Quit => " \u{2717}", // ✗ símbolo de salida
                 _ => "",
             };
             ListItem::new(format!(" {}{}", item.label, symbol))
@@ -197,7 +200,7 @@ fn render_menu_list(
         )
         .highlight_style(
             Style::default()
-                .bg(Color::Indexed(24))
+                .bg(Color::Blue)
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         )
@@ -212,15 +215,26 @@ fn render_search_bar(f: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
+    // Contar resultados reales (sin el fallback)
+    let result_count = crate::search::filter_recursive(&app.current_items, &app.search_text).len();
+
+
+    let (title, border_color) = if app.search_mode && result_count > 0 && !app.search_text.is_empty() {
+        (format!(" Buscar... ({}) ", result_count), Color::Yellow)
+    } else if app.search_mode && result_count <= 0 {
+        (String::from(" Buscar... "), Color::Red)
+    } else {
+        (String::from(" [Tab] Buscar "),  Color::Yellow)
+    };
+
     let input_panel = Paragraph::new(app.search_text.as_str()).block(
         Block::default()
-            .title(" Buscar... ")
+            .title(title)
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(Color::Yellow)),
+            .border_style(Style::default().fg(border_color)),
     );
 
-    // Posicion del cursor: x = borde izq + chars escritos + 1 (por el borde)
     let cursor_x = area
         .x
         .saturating_add(app.search_text.chars().count() as u16)
@@ -247,8 +261,9 @@ fn render_preview_popup(
         .and_then(|i| items.get(i))
         .map(|item| match &item.action {
             MenuAction::Execute(cmd) => format!("$ {}", cmd),
+            MenuAction::Quit => String::from("(salir)"),
             MenuAction::OpenSubmenu(_) => String::from("(submenú)"),
-        })
+        })        
         .unwrap_or_else(|| String::from("(sin selección)"));
 
     let screen = f.area();
@@ -304,6 +319,7 @@ fn render_help_modal(f: &mut Frame) {
         ("Ctrl+Q",      "Salir de la aplicación"),
         ("F2",          "Mostrar / ocultar vista previa"),
         ("F1",          "Mostrar / cerrar esta ayuda"),
+        ("Inicio",      "Ir al menú raíz"),
     ];
 
     let rows: Vec<Row> = shortcuts
@@ -311,7 +327,7 @@ fn render_help_modal(f: &mut Frame) {
         .map(|(key, desc)| {
             Row::new(vec![
                 Cell::from(Span::styled(
-                    format!(" {:‣<1} {} ", "", key),  // padding visual
+                    format!(" › {} ", key),
                     Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
                 )),
                 Cell::from(Span::raw(format!(" {} ", desc))),

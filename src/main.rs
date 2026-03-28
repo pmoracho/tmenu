@@ -21,9 +21,9 @@ use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 #[command(
-    author = "Patricio Moracho",
-    version = "1.0",
-    about = "Lector de menus interactivos TUI",
+    author,
+    version,
+    about,
     long_about = None
 )]
 struct Args {
@@ -43,7 +43,8 @@ fn main() -> Result<(), AppError> {
         let _ = disable_raw_mode();
         let _ = execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture);
         original_hook(info);
-    }));    
+    }));
+
     let args = Args::parse();
 
     let mut app = App::from_toon(&args.menu_file, args.debug)
@@ -102,7 +103,7 @@ fn run_app(
                 }
                 continue;
             }
-            // Ctrl+Q sale desde cualquier modo
+            // Ctrl+q sale desde cualquier modo
             if key.modifiers.contains(event::KeyModifiers::CONTROL)
                 && key.code == KeyCode::Char('q')
             {
@@ -110,7 +111,6 @@ fn run_app(
             }
 
             let should_quit = if app.search_mode {
-                // FIX: se pasa key.code; no se hace un segundo event::read()
                 handle_search_mode(terminal, app, key.code)?
             } else {
                 handle_navigation_mode(terminal, app, key.code)?
@@ -122,9 +122,6 @@ fn run_app(
                 }
             }                
 
-            // Después de handle_navigation_mode o handle_search_mode:
-
-
             if should_quit {
                 return Ok(());
             }
@@ -132,7 +129,8 @@ fn run_app(
     }
 }
 
-// run_help_modal retorna true si el usuario pidió salir
+/// Loop bloqueante del modal de ayuda.
+/// Retorna Ok(true) si el usuario eligió salir de la app, Ok(false) si cerró la ayuda para volver al menú.
 fn run_help_modal(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     app: &mut App,
@@ -233,12 +231,13 @@ fn handle_search_mode(
     key: KeyCode,
 ) -> Result<bool, AppError> {
     match key {
-        KeyCode::Tab => {
+        KeyCode::Tab | KeyCode::Esc => {
             app.search_mode = false;
             app.search_text.clear();
         }
         KeyCode::Backspace => {
             app.search_text.pop();
+            app.state.select(Some(0));
         }
         KeyCode::F(2) => app.show_preview = !app.show_preview,
         KeyCode::Enter => {
@@ -252,7 +251,9 @@ fn handle_search_mode(
         }
         KeyCode::Char(c) => {
             app.search_text.push(c);
+            app.state.select(Some(0));
         }
+
         _ => {}
     }
     Ok(false)
@@ -276,7 +277,11 @@ fn handle_navigation_mode(
                 return Ok(true);
             }
         }
-        KeyCode::Left | KeyCode::Esc => app.back(),
+        KeyCode::Left | KeyCode::Esc => {
+            if !app.back() {
+                return Ok(true); // estamos en root, salir
+            }
+        }        
         _ => {}
     }
     Ok(false)

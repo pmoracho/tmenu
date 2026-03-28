@@ -1,0 +1,12 @@
+# Ejemplo de menú para un proyecto con comandos de Git y Docker
+"Mi proyecto":
+    Git:
+        Estado:        "git status"
+        Pull:          "git pull"
+        Push:          "git push"
+        "Nuevo branch":  "git checkout -b {{text: Branch name}}"
+    Docker:
+        Levantar:      "docker compose up -d"
+        Bajar:         "docker compose down"
+        Logs:          "docker compose logs -f"
+    Salir: exit

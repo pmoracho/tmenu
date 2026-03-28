@@ -10,6 +10,8 @@ Características principales
 
 ![Con {tab} se puede buscar](images/temnu-2.png)
 
+[**TUTORIAL de USO**](tutorial/tutorial.md)
+
 Requisitos
 - Rust (toolchain estable) y `cargo` instalados.
 

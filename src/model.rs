@@ -3,9 +3,8 @@ use ratatui::widgets::ListState;
 /// Acción asociada a cada ítem del menú.
 #[derive(Clone)]
 pub enum MenuAction {
-    /// Comando de shell a ejecutar.
     Execute(String),
-    /// Submenú con su lista de ítems.
+    Quit,
     OpenSubmenu(Vec<MenuItem>),
 }
 

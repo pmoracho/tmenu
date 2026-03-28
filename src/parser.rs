@@ -60,11 +60,16 @@ pub fn parse_toon_file(path: &Path) -> Result<(String, Vec<MenuItem>), AppError>
                 }
                 stack.push((key, Vec::new(), level));
             } else {
-                // Es un comando
-                let item = MenuItem {
-                    label: key,
-                    action: MenuAction::Execute(value.trim_matches('"').to_string()),
+                while stack.last().map_or(false, |e| e.2 >= level) {
+                    pop_and_insert(&mut stack, &mut root_items);
+                }
+                let raw_value = value.trim_matches('"').to_string();
+                let action = if raw_value == "exit" {
+                    MenuAction::Quit
+                } else {
+                    MenuAction::Execute(raw_value)
                 };
+                let item = MenuItem { label: key, action };
                 if let Some(parent) = stack.last_mut() {
                     parent.1.push(item);
                 } else {
