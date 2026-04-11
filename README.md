@@ -6,9 +6,12 @@ Características principales
 - Menú ligero y rápido para la terminal.
 - Configuración vía archivo `tmenu.toon` (ubicado en el repositorio).
 
+
 ![Menu estándar](images/tmenu-1.png)
 
 ![Con {tab} se puede buscar](images/temnu-2.png)
+
+<script src="https://asciinema.org/a/IcOZcRl8ZLHU9kU0.js" id="asciicast-IcOZcRl8ZLHU9kU0" async="true"></script>
 
 [**TUTORIAL de USO**](tutorial/tutorial.md)
 
