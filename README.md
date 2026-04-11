@@ -7,6 +7,8 @@ Características principales
 - Configuración vía archivo `tmenu.toon` (ubicado en el repositorio).
 
 
+![Interacción](images/tmenu.svg)
+
 ![Menu estándar](images/tmenu-1.png)
 
 ![Con {tab} se puede buscar](images/temnu-2.png)
