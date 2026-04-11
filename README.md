@@ -1,13 +1,12 @@
 # tmenu
 
+![Interacción](images/tmenu.svg)
+
 tmenu es una pequeña utilidad de menú para terminal escrita en Rust.
 
 Características principales
 - Menú ligero y rápido para la terminal.
 - Configuración vía archivo `tmenu.toon` (ubicado en el repositorio).
-
-
-![Interacción](images/tmenu.svg)
 
 [**TUTORIAL de USO**](tutorial/tutorial.md)
 
