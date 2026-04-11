@@ -201,16 +201,17 @@ impl App {
 
         // Ejecutar el comando
         #[cfg(target_os = "windows")]
-        let status = Command::new("cmd").args(["/C", cmd]).spawn();
+        {
+            let status = Command::new("cmd").args(["/C", cmd]).spawn();
+            handle_status(status);
+        }
+
         #[cfg(not(target_os = "windows"))]
-        let parts: Vec<&str> = cmd.split_whitespace().collect();
-        if let Some((bin, args)) = parts.split_first() {
-            let status = Command::new(bin).args(args).spawn();
-            match status {
-                Ok(mut child) => {
-                    let _ = child.wait();
-                }
-                Err(e) => eprintln!("[error] no se pudo ejecutar el comando: {}", e),
+        {
+            let parts: Vec<&str> = cmd.split_whitespace().collect();
+            if let Some((bin, args)) = parts.split_first() {
+                let status = Command::new(bin).args(args).spawn();
+                handle_status(status);
             }
         }
 
