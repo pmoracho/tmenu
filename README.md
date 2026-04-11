@@ -13,8 +13,6 @@ Características principales
 
 ![Con {tab} se puede buscar](images/temnu-2.png)
 
-[![asciicast](https://asciinema.org/a/IcOZcRl8ZLHU9kU0)](https://asciinema.org/a/IcOZcRl8ZLHU9kU0)
-
 [**TUTORIAL de USO**](tutorial/tutorial.md)
 
 Requisitos
