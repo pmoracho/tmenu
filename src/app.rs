@@ -199,19 +199,21 @@ impl App {
             eprintln!("[warn] no se pudo restaurar la terminal: {}", e);
         }
 
-        // Ejecutar el comando
-        #[cfg(target_os = "windows")]
-        let status = Command::new("cmd").args(["/C", cmd]).spawn();
-        #[cfg(not(target_os = "windows"))]
-        let parts: Vec<&str> = cmd.split_whitespace().collect();
-        if let Some((bin, args)) = parts.split_first() {
-            let status = Command::new(bin).args(args).spawn();
-            match status {
-                Ok(mut child) => {
-                    let _ = child.wait();
-                }
-                Err(e) => eprintln!("[error] no se pudo ejecutar el comando: {}", e),
-            }
+        let mut command = if cfg!(target_os = "windows") {
+            let mut c = Command::new("cmd");
+            c.args(["/C", cmd]);
+            c
+        } else {
+            let parts: Vec<&str> = cmd.split_whitespace().collect();
+            let (bin, args) = parts.split_first().unwrap_or((&cmd, &[]));
+            let mut c = Command::new(bin);
+            c.args(args);
+            c
+        };
+
+        match command.spawn() {
+            Ok(mut child) => { let _ = child.wait(); }
+            Err(e) => eprintln!("[error] no se pudo ejecutar el comando: {}", e),
         }
 
         println!("\nPresioná Enter para volver...");
