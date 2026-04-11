@@ -11,7 +11,7 @@ Características principales
 
 ![Con {tab} se puede buscar](images/temnu-2.png)
 
-<script src="https://asciinema.org/a/IcOZcRl8ZLHU9kU0.js" id="asciicast-IcOZcRl8ZLHU9kU0" async="true"></script>
+[![asciicast](https://asciinema.org/a/IcOZcRl8ZLHU9kU0)](https://asciinema.org/a/IcOZcRl8ZLHU9kU0)
 
 [**TUTORIAL de USO**](tutorial/tutorial.md)
 
