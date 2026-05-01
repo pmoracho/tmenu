@@ -54,14 +54,14 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     let menu_area = chunks[0];
     render_menu_list(f, app, &items_to_render, menu_area, &title);
     render_search_bar(f, app, chunks[1]);
-    
+
     if app.wizard.is_some() {
         render_wizard(f, app);
     } else if app.show_help {
         render_help_modal(f);
     } else {
         render_preview_popup(f, app, &items_to_render, menu_area);
-    }  
+    }
 }
 
 fn render_wizard(f: &mut Frame, app: &App) {
@@ -216,7 +216,7 @@ fn render_search_bar(f: &mut Frame, app: &App, area: Rect) {
     }
 
     // Contar resultados reales (sin el fallback)
-    let result_count = crate::search::filter_recursive(&app.current_items, &app.search_text).len();
+    let result_count = crate::search::filter_recursive(&app.current_items, &app.search_text, 0).len();
 
 
     let (title, border_color) = if app.search_mode && result_count > 0 && !app.search_text.is_empty() {
@@ -263,7 +263,7 @@ fn render_preview_popup(
             MenuAction::Execute(cmd) => format!("$ {}", cmd),
             MenuAction::Quit => String::from("(salir)"),
             MenuAction::OpenSubmenu(_) => String::from("(submenú)"),
-        })        
+        })
         .unwrap_or_else(|| String::from("(sin selección)"));
 
     let screen = f.area();
@@ -319,7 +319,6 @@ fn render_help_modal(f: &mut Frame) {
         ("Ctrl+Q",      "Salir de la aplicación"),
         ("F2",          "Mostrar / ocultar vista previa"),
         ("F1",          "Mostrar / cerrar esta ayuda"),
-        ("Inicio",      "Ir al menú raíz"),
     ];
 
     let rows: Vec<Row> = shortcuts

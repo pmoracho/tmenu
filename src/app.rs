@@ -24,7 +24,7 @@ pub struct App {
     pub state: ListState,
     pub search_text: String,
     pub search_mode: bool,
-    pub show_preview: bool, 
+    pub show_preview: bool,
     pub show_help: bool,
     pub debug: bool,
     pub wizard: Option<WizardState>,
@@ -59,7 +59,7 @@ impl App {
             return self.current_items.clone();
         }
 
-        let mut results = filter_recursive(&self.current_items, &self.search_text);
+        let mut results = filter_recursive(&self.current_items, &self.search_text,  0);
 
         if results.is_empty() {
             if let Some(fallback) = find_first_command(&self.current_items) {
@@ -199,22 +199,32 @@ impl App {
             eprintln!("[warn] no se pudo restaurar la terminal: {}", e);
         }
 
-        let mut command = if cfg!(target_os = "windows") {
-            let mut c = Command::new("cmd");
-            c.args(["/C", cmd]);
-            c
-        } else {
-            let parts: Vec<&str> = cmd.split_whitespace().collect();
-            let (bin, args) = parts.split_first().unwrap_or((&cmd, &[]));
-            let mut c = Command::new(bin);
-            c.args(args);
-            c
-        };
-
-        match command.spawn() {
-            Ok(mut child) => { let _ = child.wait(); }
-            Err(e) => eprintln!("[error] no se pudo ejecutar el comando: {}", e),
+        #[cfg(target_os = "windows")]
+        {
+            let mut command = Command::new("cmd");
+            command.args(["/C", cmd]);
+            match command.spawn() {
+                Ok(mut child) => { let _ = child.wait(); }
+                Err(e) => eprintln!("[error] no se pudo ejecutar el comando: {}", e),
+            }
         }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            let parts = shlex::split(cmd).unwrap_or_else(|| {
+                // Fallback si el quoting está malformado: split simple
+                cmd.split_whitespace().map(str::to_string).collect()
+            });
+            if let Some((bin, args)) = parts.split_first() {
+                let mut command = Command::new(bin);
+                command.args(args);
+                match command.spawn() {
+                    Ok(mut child) => { let _ = child.wait(); }
+                    Err(e) => eprintln!("[error] no se pudo ejecutar el comando: {}", e),
+                }
+            }
+        }
+
 
         println!("\nPresioná Enter para volver...");
         let _ = io::stdin().read_line(&mut String::new());
@@ -262,7 +272,7 @@ impl App {
             return current.to_string();
         }
         current.chars().take(MAX_WIDTH).collect()
-    }  
+    }
     /// Ejecuta el comando resuelto y limpia el wizard.
     pub fn finish_wizard<B: Backend>(
         &mut self,
@@ -270,18 +280,26 @@ impl App {
     ) -> Result<bool, AppError> {
         if let Some(ref wizard) = self.wizard {
             let cmd = wizard.resolve();
+            if !Self::is_safe_command(&cmd) {
+                return Err(AppError::ForbiddenCommand(cmd));
+            }
             self.wizard = None;
             self.execute_external_command(terminal, &cmd)?;
         }
         Ok(false)
-    }    
+    }
 
     fn is_safe_command(cmd: &str) -> bool {
-    cmd.chars().all(|c| matches!(c,
-        'a'..='z' | 'A'..='Z' | '0'..='9'
-        | ' ' | '.' | '/' | '_' | '-' | '='
-    ))
-}
+        let parts: Vec<&str> = cmd.split_whitespace().collect();
+        let Some(bin) = parts.first() else { return false };
+        // No permitir path traversal
+        if parts.iter().any(|p| p.contains("..")) {
+            return false;
+        }
+        // El binario no debe ser path relativo ambiguo
+        !bin.starts_with("../")
+    }
+
 }
 
 /// Estado del wizard de interpolación de parámetros.

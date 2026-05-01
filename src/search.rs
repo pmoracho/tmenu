@@ -14,7 +14,10 @@ pub fn is_fuzzy_match(text: &str, query: &str) -> bool {
 /// Filtra recursivamente los ítems del menú usando coincidencia fuzzy sobre
 /// los ítems ejecutables (comandos). Los submenús se recorren pero no se incluyen
 /// directamente en los resultados.
-pub fn filter_recursive(items: &[MenuItem], query: &str) -> Vec<MenuItem> {
+pub fn filter_recursive(items: &[MenuItem], query: &str, depth: usize) -> Vec<MenuItem> {
+    if depth > 32 {
+        return Vec::new(); // prevenir recursión excesiva
+    }
     let mut results = Vec::new();
     for item in items {
         match &item.action {
@@ -24,7 +27,7 @@ pub fn filter_recursive(items: &[MenuItem], query: &str) -> Vec<MenuItem> {
                 }
             }
             MenuAction::OpenSubmenu(sub_items) => {
-                results.extend(filter_recursive(sub_items, query));
+                results.extend(filter_recursive(sub_items, query, depth + 1));
             }
         }
     }
