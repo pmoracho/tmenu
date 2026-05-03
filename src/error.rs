@@ -9,6 +9,7 @@ pub enum AppError {
     TerminalError(String),
     ForbiddenCommand(String),
     EventError(String),
+    HistoryError(String),
 }
 
 impl fmt::Display for AppError {
@@ -23,6 +24,7 @@ impl fmt::Display for AppError {
                 write!(f, "El comando contiene caracteres no permitidos: '{}'", c)
             }
             AppError::EventError(msg) => write!(f, "Error de evento de terminal: {}", msg),
+            AppError::HistoryError(msg) => write!(f, "Error al guardar historial: {}", msg),
         }
     }
 }

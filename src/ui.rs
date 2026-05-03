@@ -59,6 +59,8 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         render_wizard(f, app);
     } else if app.show_help {
         render_help_modal(f);
+    } else if app.confirmation.is_some() {
+        render_confirmation_modal(f, app);
     } else {
         render_preview_popup(f, app, &items_to_render, menu_area);
     }
@@ -356,6 +358,84 @@ fn render_help_modal(f: &mut Frame) {
     f.render_widget(Clear, area);
     f.render_widget(table, area);
 
+}
+
+/// Modal de confirmación: muestra el comando y opciones Sí/No con navegación.
+fn render_confirmation_modal(f: &mut Frame, app: &App) {
+    use ratatui::widgets::Clear;
+    use ratatui::text::Span;
+
+    let Some(confirmation) = &app.confirmation else { return };
+
+    // Truncar comando muy largo
+    let cmd_text = &confirmation.cmd;
+    let max_cmd_width = 50;
+    let cmd_display = if cmd_text.chars().count() > max_cmd_width {
+        let truncated: String = cmd_text.chars().take(max_cmd_width.saturating_sub(3)).collect();
+        format!("{}...", truncated)
+    } else {
+        cmd_text.clone()
+    };
+
+    let popup_w: u16 = 64;
+    let popup_h: u16 = 10; // título + cmd + separador + opciones + bordes + padding
+    let area = centered_rect(popup_w, popup_h, f.area());
+
+    f.render_widget(Clear, area);
+
+    let inner = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(2), // línea del comando
+            Constraint::Length(1), // separador
+            Constraint::Length(3), // opciones Sí/No
+        ])
+        .margin(1)
+        .split(area);
+
+    // Bloque contenedor
+    let block = Block::default()
+        .title(" ¿Ejecutar comando? ")
+        .title_alignment(Alignment::Center)
+        .title_bottom(Line::from(" [Enter] Confirmar  [Esc] Cancelar ").centered())
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Yellow));
+    f.render_widget(block, area);
+
+    // Mostrar el comando
+    let cmd_widget = Paragraph::new(cmd_display)
+        .style(Style::default().fg(Color::Cyan));
+    f.render_widget(cmd_widget, inner[0]);
+
+    // Opciones: "[ Sí ]  [ No ]" con la selección destacada
+    let si_style = if confirmation.selected == 0 {
+        Style::default()
+            .bg(Color::Blue)
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    };
+
+    let no_style = if confirmation.selected == 1 {
+        Style::default()
+            .bg(Color::Blue)
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    };
+
+    let options = vec![
+        Span::styled("  [ Sí ]  ", si_style),
+        Span::raw("     "),
+        Span::styled("[ No ]  ", no_style),
+    ];
+
+    let options_widget = Paragraph::new(Line::from(options))
+        .alignment(Alignment::Center);
+    f.render_widget(options_widget, inner[2]);
 }
 
 /// Calcula un Rect centrado dentro de `r` con el tamano indicado,

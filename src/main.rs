@@ -5,6 +5,7 @@ mod model;
 mod parser;
 mod search;
 mod ui;
+mod history;
 
 use app::App;
 use error::AppError;
@@ -120,7 +121,7 @@ fn run_app(
                 if quit {
                     return Ok(());
                 }
-            }                
+            }
 
             if should_quit {
                 return Ok(());
@@ -223,6 +224,68 @@ fn run_wizard(
     }
 }
 
+
+/// Loop bloqueante del modal de confirmación.
+/// Retorna true si el usuario confirmó (Sí), false si canceló (No).
+pub fn run_confirmation_modal(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    app: &mut App,
+) -> Result<bool, AppError> {
+    loop {
+        terminal
+            .draw(|f| ui::ui(f, app))
+            .map_err(|e| AppError::TerminalError(e.to_string()))?;
+
+        if let Event::Key(key) = event::read()
+            .map_err(|e| AppError::EventError(e.to_string()))?
+        {
+            if key.kind != event::KeyEventKind::Press {
+                continue;
+            }
+
+            match key.code {
+                // Up/Down navega entre "Sí" y "No"
+                KeyCode::Up | KeyCode::Left => {
+                    if let Some(ref mut conf) = app.confirmation {
+                        conf.toggle();
+                    }
+                }
+                KeyCode::Down | KeyCode::Right => {
+                    if let Some(ref mut conf) = app.confirmation {
+                        conf.toggle();
+                    }
+                }
+                // Enter confirma la selección actual
+                KeyCode::Enter => {
+                    let confirmed = app.confirmation
+                        .as_ref()
+                        .map(|c| c.is_confirmed())
+                        .unwrap_or(false);
+                    app.confirmation = None;
+                    return Ok(confirmed);
+                }
+                // Esc o N = cancelar (ir a "No" implícitamente)
+                KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
+                    app.confirmation = None;
+                    return Ok(false);
+                }
+                // Y = confirmar (ir a "Sí" implícitamente)
+                KeyCode::Char('y') | KeyCode::Char('Y') => {
+                    app.confirmation = None;
+                    return Ok(true);
+                }
+                // Ctrl+Q cancela y sale de la app
+                _ if key.modifiers.contains(event::KeyModifiers::CONTROL)
+                    && key.code == KeyCode::Char('q') => {
+                    app.confirmation = None;
+                    return Err(AppError::EventError("Cancelado por Ctrl+Q".to_string()));
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
 /// Maneja teclas en modo busqueda.
 /// Recibe el KeyCode ya leido por el loop — sin segundo event::read().
 fn handle_search_mode(
@@ -281,7 +344,7 @@ fn handle_navigation_mode(
             if !app.back() {
                 return Ok(true); // estamos en root, salir
             }
-        }        
+        }
         _ => {}
     }
     Ok(false)

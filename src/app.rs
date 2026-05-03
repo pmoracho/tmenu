@@ -1,4 +1,4 @@
-use ratatui::{Terminal, backend::Backend, widgets::ListState};
+use ratatui::{Terminal, backend::{CrosstermBackend}, widgets::ListState};
 
 use crossterm::{
     execute,
@@ -8,11 +8,11 @@ use crossterm::{
     event::DisableMouseCapture,
     event::EnableMouseCapture,
 };
-use std::io;
+use std::io::{self, Stdout};
 use std::process::Command;
 
-use crate::{error::AppError, parser};
-use crate::model::{HistoryEntry, MenuAction, MenuItem, CommandParam};
+use crate::{error::AppError, parser, history};
+use crate::model::{HistoryEntry, MenuAction, MenuItem, CommandParam, ConfirmationState};
 use crate::parser::parse_toon_file;
 use crate::search::{filter_recursive, find_first_command};
 
@@ -21,6 +21,9 @@ pub struct App {
     pub history: Vec<HistoryEntry>,
     pub current_title: String,
     pub current_items: Vec<MenuItem>,
+    /// Ítems del menú raíz, guardados al inicio para que `go_home` sea exacto.
+    pub root_title: String,
+    pub root_items: Vec<MenuItem>,
     pub state: ListState,
     pub search_text: String,
     pub search_mode: bool,
@@ -28,6 +31,8 @@ pub struct App {
     pub show_help: bool,
     pub debug: bool,
     pub wizard: Option<WizardState>,
+    /// Modal de confirmación: Some(cmd) = usuario debe confirmar; None = no hay confirmación pendiente
+    pub confirmation: Option<ConfirmationState>,
 }
 
 impl App {
@@ -40,8 +45,10 @@ impl App {
 
         Ok(App {
             history: Vec::new(),
-            current_title: main_title,
-            current_items: root_items,
+            current_title: main_title.clone(),
+            current_items: root_items.clone(),
+            root_title: main_title,
+            root_items,
             state,
             search_text: String::new(),
             search_mode: false,
@@ -49,6 +56,7 @@ impl App {
             show_help: false,
             debug,
             wizard: None,
+            confirmation: None,
         })
     }
 
@@ -59,7 +67,7 @@ impl App {
             return self.current_items.clone();
         }
 
-        let mut results = filter_recursive(&self.current_items, &self.search_text,  0);
+        let mut results = filter_recursive(&self.current_items, &self.search_text, 0);
 
         if results.is_empty() {
             if let Some(fallback) = find_first_command(&self.current_items) {
@@ -104,16 +112,18 @@ impl App {
         }
     }
 
-    /// Vuelve directamente al menú raíz, limpiando todo el historial.
+    /// Vuelve directamente al menú raíz usando los ítems guardados al inicio.
+    /// Fix: el código original usaba `history.drain().next()` que descartaba
+    /// el estado real del root (guardaba el estado al entrar al primer submenú).
     pub fn go_home(&mut self) {
         if self.history.is_empty() {
             return;
         }
-        // El root es el primer elemento guardado
-        let root = self.history.drain(..).next().unwrap();
-        self.current_title = root.title;
-        self.current_items = root.items;
-        self.state = root.state;
+        self.history.clear();
+        self.current_title = self.root_title.clone();
+        self.current_items = self.root_items.clone();
+        self.state = ListState::default();
+        self.state.select(Some(0));
     }
 
     /// Guarda el estado actual en el historial antes de navegar a un submenú.
@@ -127,9 +137,9 @@ impl App {
 
     /// Activa el ítem en el índice seleccionado de `list`.
     /// Retorna `true` si la aplicación debe cerrarse (comando "exit").
-    pub fn activate_item<B: Backend>(
+    pub fn activate_item(
         &mut self,
-        terminal: &mut Terminal<B>,
+        terminal: &mut Terminal<CrosstermBackend<Stdout>>,
         list: &[MenuItem],
     ) -> Result<bool, AppError> {
         let Some(index) = self.state.selected() else {
@@ -149,11 +159,16 @@ impl App {
 
                 let params = parser::extract_params(cmd);
                 if params.is_empty() {
-                    // Sin interpolación: ejecutar directo como antes
-                    self.execute_external_command(terminal, cmd)?;
+                    // Sin interpolación: pedir confirmación solo si el ítem lo requiere
+                    if item.require_confirmation {
+                        return self.request_command_confirmation(terminal, cmd);
+                    } else {
+                        // Ejecutar directo sin confirmación
+                        self.execute_external_command(terminal, cmd)?;
+                    }
                 } else {
                     // Con interpolación: iniciar wizard (no ejecutar todavía)
-                    self.wizard = Some(WizardState::new(params, cmd.to_string()));
+                    self.wizard = Some(WizardState::new(params, cmd.to_string(), item.require_confirmation));
                 }
             }
             MenuAction::OpenSubmenu(sub_items) => {
@@ -169,20 +184,102 @@ impl App {
         Ok(false)
     }
 
+    /// Intenta ejecutar un comando, mostrando primero un modal de confirmación.
+    /// Si el usuario confirma (Sí), se ejecuta y se registra en el historial.
+    /// Retorna true si la app debe cerrarse.
+    pub fn request_command_confirmation(
+        &mut self,
+        terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+        cmd: &str,
+    ) -> Result<bool, AppError> {
+        if !Self::is_safe_command(cmd) {
+            return Err(AppError::ForbiddenCommand(cmd.to_string()));
+        }
+
+        // Mostrar modal de confirmación
+        self.confirmation = Some(ConfirmationState::new(cmd.to_string()));
+
+        // Ejecutar el modal bloqueante — devuelve true si se ejecutó, false si se canceló
+        let should_execute = crate::run_confirmation_modal(terminal, self)?;
+
+        if should_execute {
+            self.execute_command_internal(terminal, cmd)?;
+        }
+
+        Ok(false)
+    }
+
+    /// Ejecuta un comando externo SIN pedir confirmación.
+    /// (Usado internamente después de que el usuario confirma).
+    fn execute_command_internal(
+        &self,
+        terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+        cmd: &str,
+    ) -> Result<(), AppError> {
+        if self.debug {
+            eprintln!("[debug] ejecutando: {:?}", cmd);
+        }
+
+        // Restaurar terminal a modo normal
+        let _ = disable_raw_mode();
+        if let Err(e) = execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture) {
+            eprintln!("[warn] no se pudo restaurar la terminal: {}", e);
+        }
+
+        // Parsear respetando quoting ("arg con espacios" se trata como un solo arg).
+        // Fallback a split_whitespace si shlex falla (comillas desbalanceadas, etc).
+        let parts: Vec<String> = shlex::split(cmd).unwrap_or_else(|| {
+            cmd.split_whitespace().map(str::to_string).collect()
+        });
+
+        if let Some((bin, args)) = parts.split_first() {
+            let mut command = Command::new(bin);
+            command.args(args);
+            match command.spawn() {
+                Ok(mut child) => {
+                    let _ = child.wait();
+                    // Registrar en historial solo si la ejecución fue exitosa
+                    if let Err(e) = history::log_command(cmd) {
+                        eprintln!("[warn] no se pudo guardar en historial: {}", e);
+                    }
+                }
+                Err(e) => eprintln!("[error] no se pudo ejecutar '{}': {}", bin, e),
+            }
+        }
+
+        println!("\nPresioná Enter para volver al menú...");
+        let _ = io::stdin().read_line(&mut String::new());
+
+        // Volver a modo TUI
+        if let Err(e) = enable_raw_mode() {
+            eprintln!("[warn] no se pudo activar raw mode: {}", e);
+        }
+        if let Err(e) = execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture) {
+            eprintln!("[warn] no se pudo restaurar pantalla alternativa: {}", e);
+        }
+        terminal
+            .clear()
+            .map_err(|e| AppError::TerminalError(e.to_string()))?;
+
+        Ok(())
+    }
+
     /// Ejecuta un comando externo en el shell del sistema operativo.
     ///
     /// Antes de ejecutar, restaura la terminal a modo normal y la reconfigura
     /// en modo TUI al finalizar.
     ///
     /// # Seguridad
-    /// Se rechazan comandos que contengan caracteres de shell peligrosos para
-    /// evitar inyección de comandos desde el archivo `.toon`.
-    pub fn execute_external_command<B: Backend>(
+    /// - Rechaza comandos con path traversal (`..`).
+    /// - Usa `shlex::split` para respetar quoting correctamente en lugar de
+    ///   `split_whitespace`, que parte argumentos con espacios.
+    /// - Los valores interpolados por el wizard se validan aquí también,
+    ///   ya que `finish_wizard` llama a este método con el comando resuelto.
+    pub fn execute_external_command(
         &self,
-        terminal: &mut Terminal<B>,
+        terminal: &mut Terminal<CrosstermBackend<Stdout>>,
         cmd: &str,
     ) -> Result<(), AppError> {
-        // Validar caracteres peligrosos
         if !Self::is_safe_command(cmd) {
             return Err(AppError::ForbiddenCommand(cmd.to_string()));
         }
@@ -193,40 +290,32 @@ impl App {
 
         // Restaurar terminal a modo normal
         let _ = disable_raw_mode();
-        if let Err(e) =
-            execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)
-        {
+        if let Err(e) = execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture) {
             eprintln!("[warn] no se pudo restaurar la terminal: {}", e);
         }
 
-        #[cfg(target_os = "windows")]
-        {
-            let mut command = Command::new("cmd");
-            command.args(["/C", cmd]);
+        // Parsear respetando quoting ("arg con espacios" se trata como un solo arg).
+        // Fallback a split_whitespace si shlex falla (comillas desbalanceadas, etc).
+        let parts: Vec<String> = shlex::split(cmd).unwrap_or_else(|| {
+            cmd.split_whitespace().map(str::to_string).collect()
+        });
+
+        if let Some((bin, args)) = parts.split_first() {
+            let mut command = Command::new(bin);
+            command.args(args);
             match command.spawn() {
-                Ok(mut child) => { let _ = child.wait(); }
-                Err(e) => eprintln!("[error] no se pudo ejecutar el comando: {}", e),
-            }
-        }
-
-        #[cfg(not(target_os = "windows"))]
-        {
-            let parts = shlex::split(cmd).unwrap_or_else(|| {
-                // Fallback si el quoting está malformado: split simple
-                cmd.split_whitespace().map(str::to_string).collect()
-            });
-            if let Some((bin, args)) = parts.split_first() {
-                let mut command = Command::new(bin);
-                command.args(args);
-                match command.spawn() {
-                    Ok(mut child) => { let _ = child.wait(); }
-                    Err(e) => eprintln!("[error] no se pudo ejecutar el comando: {}", e),
+                Ok(mut child) => {
+                    let _ = child.wait();
+                    // Registrar en historial solo si la ejecución fue exitosa
+                    if let Err(e) = history::log_command(cmd) {
+                        eprintln!("[warn] no se pudo guardar en historial: {}", e);
+                    }
                 }
+                Err(e) => eprintln!("[error] no se pudo ejecutar '{}': {}", bin, e),
             }
         }
 
-
-        println!("\nPresioná Enter para volver...");
+        println!("\nPresioná Enter para volver al menú...");
         let _ = io::stdin().read_line(&mut String::new());
 
         // Volver a modo TUI
@@ -273,31 +362,43 @@ impl App {
         }
         current.chars().take(MAX_WIDTH).collect()
     }
-    /// Ejecuta el comando resuelto y limpia el wizard.
-    pub fn finish_wizard<B: Backend>(
+    /// Finaliza el wizard: si requiere confirmación, muestra modal; sino, ejecuta directo.
+    pub fn finish_wizard(
         &mut self,
-        terminal: &mut Terminal<B>,
+        terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     ) -> Result<bool, AppError> {
         if let Some(ref wizard) = self.wizard {
             let cmd = wizard.resolve();
-            if !Self::is_safe_command(&cmd) {
-                return Err(AppError::ForbiddenCommand(cmd));
-            }
+            let require_confirmation = wizard.require_confirmation;
             self.wizard = None;
-            self.execute_external_command(terminal, &cmd)?;
+
+            if require_confirmation {
+                // Pedir confirmación antes de ejecutar el comando resuelto
+                return self.request_command_confirmation(terminal, &cmd);
+            } else {
+                // Ejecutar directo sin confirmación
+                self.execute_external_command(terminal, &cmd)?;
+            }
         }
         Ok(false)
     }
 
+    /// Valida que el comando no contenga path traversal ni caracteres de shell peligrosos.
+    ///
+    /// Nota: no se usan pipes/shell, así que `|`, `&`, `;` no son vectores de inyección
+    /// en este contexto — pero `..` sí puede usarse para path traversal en argumentos.
     fn is_safe_command(cmd: &str) -> bool {
-        let parts: Vec<&str> = cmd.split_whitespace().collect();
-        let Some(bin) = parts.first() else { return false };
-        // No permitir path traversal
-        if parts.iter().any(|p| p.contains("..")) {
+        // Rechazar path traversal explícito
+        if cmd.split_whitespace().any(|part| part.contains("..")) {
             return false;
         }
-        // El binario no debe ser path relativo ambiguo
-        !bin.starts_with("../")
+        // Allowlist de caracteres válidos (extendida respecto al original)
+        cmd.chars().all(|c| matches!(c,
+            'a'..='z' | 'A'..='Z' | '0'..='9'
+            | ' ' | '.' | '/' | '_' | '-' | '='
+            | ':' | '@' | '+' | '%' | '~' | ','
+            | '\'' | '"'
+        ))
     }
 
 }
@@ -314,10 +415,12 @@ pub struct WizardState {
     pub input: String,
     /// Comando original con placeholders sin reemplazar.
     pub original_cmd: String,
+    /// Si el ítem requiere confirmación después del wizard.
+    pub require_confirmation: bool,
 }
 
 impl WizardState {
-    pub fn new(params: Vec<CommandParam>, cmd: String) -> Self {
+    pub fn new(params: Vec<CommandParam>, cmd: String, require_confirmation: bool) -> Self {
         let len = params.len();
         WizardState {
             params,
@@ -325,6 +428,7 @@ impl WizardState {
             values: vec![String::new(); len],
             input: String::new(),
             original_cmd: cmd,
+            require_confirmation,
         }
     }
 
@@ -356,3 +460,4 @@ impl WizardState {
     }
 
 }
+

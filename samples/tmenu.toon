@@ -22,7 +22,7 @@
     Formatear: cargo fmt
     "Seguridad (Audit)": cargo audit
   Documentación:
-    "Generar Docs": cargo doc
+    "Generar Docs": "cargo doc" [confirm=true]
     "Ver en Navegador": cargo doc --open
     "Limpiar Documentación": rm -rf target/doc
   Limpieza:
