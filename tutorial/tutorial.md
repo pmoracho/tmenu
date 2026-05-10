@@ -18,6 +18,7 @@
   - [7. Parámetros interpolados](#7-parámetros-interpolados)
   - [8. Ayuda integrada](#8-ayuda-integrada)
   - [9. Referencia de atajos](#9-referencia-de-atajos)
+  - [10. Personalización avanzada](#10-personalización-avanzada)
 
 ---
 
@@ -27,6 +28,8 @@ Toda la estructura del menú vive en un archivo de texto plano con extensión `.
 
 ```
 # Ejemplo de menú para un proyecto con comandos de Git y Docker
+config:
+    execution_mode: clean
 "Mi proyecto":
     Git:
         Estado:        "git status"
@@ -40,13 +43,15 @@ Toda la estructura del menú vive en un archivo de texto plano con extensión `.
     Salir: exit
 ```
 
-**Reglas básicas:**
+**Reglas básicas y comentarios:**
 
 - La primera línea terminada en `:` es el **título** del menú.
 - Las entradas sin valor a la derecha del `:` son **submenús**.
 - Las entradas con valor son **comandos**.
 - `{{text: Etiqueta}}` define un **parámetro** que se pedirá al usuario antes de ejecutar.
 - `#` la línea es un comentario y se ignora.
+- El archivo debe estar en formato UTF-8 sin BOM.
+- No esperes toda la flexibilidad que ofrece el formato `.toon`, el parser es bien simple.
 
 ---
 
@@ -175,3 +180,29 @@ Presioná `Esc` o `F1` para cerrar y volver al menú.
 | `Enter` | Wizard | Confirmar campo actual |
 | `Esc` | Wizard | Cancelar y volver al menú |
 | `Ctrl+Q` | Wizard | Cancelar y salir de la app |
+
+
+### 10. Personalización avanzada
+
+**Limpiar la pantalla al ejecutar comandos**
+
+En el archivo `.toon` podés agregar una sección `config` con opciones de personalización. Por ejemplo, `execution_mode: clean` hace que al ejecutar un comando la terminal se limpie antes de mostrar la salida:
+
+```toon
+config:
+    execution_mode: clean
+```
+
+Por defecto  `tmenu` muestra la salida del comando debajo del menú, pero con esta opción se limpia la pantalla para mostrar solo la salida. Esto es útil para comandos con mucha salida o que necesitan toda la pantalla.
+
+
+**Solicitar confirmación para comandos específicos**
+
+Podés agregar `[confirm=true]` a cualquier comando para que al seleccionarlo se abra un diálogo de confirmación antes de ejecutarlo:
+
+```toon
+  "Staging y Commits":
+    "Agregar todo": git add . [confirm=true]
+```
+
+Esto muestra un popup con el comando a ejecutar y opciones "Sí" o "No". Solo si confirmás con "Sí" se ejecuta el comando. Es una buena forma de evitar ejecutar comandos sensibles por error.
