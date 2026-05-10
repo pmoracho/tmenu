@@ -37,14 +37,23 @@ struct Args {
     debug: bool,
 }
 
-fn main() -> Result<(), AppError> {
-    // registrar un hook de pánico:
+fn main() {
+   // registrar un hook de pánico:
     let original_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         let _ = disable_raw_mode();
         let _ = execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture);
         original_hook(info);
     }));
+
+    if let Err(err) = run() {
+        // Aquí es donde ocurre la magia: {} usa tu impl fmt::Display
+        eprintln!("\n❌ Error: {}", err);
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<(), AppError> {
 
     let args = Args::parse();
 
@@ -225,6 +234,7 @@ fn run_wizard(
 }
 
 
+
 /// Loop bloqueante del modal de confirmación.
 /// Retorna true si el usuario confirmó (Sí), false si canceló (No).
 pub fn run_confirmation_modal(
@@ -286,7 +296,8 @@ pub fn run_confirmation_modal(
     }
 }
 
-/// Maneja teclas en modo busqueda.
+/// Maneja teclas en modo búsqueda.
+/// Ahora las teclas de navegación (↑↓) funcionan sobre el menú filtrado en vivo.
 /// Recibe el KeyCode ya leido por el loop — sin segundo event::read().
 fn handle_search_mode(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
@@ -294,29 +305,54 @@ fn handle_search_mode(
     key: KeyCode,
 ) -> Result<bool, AppError> {
     match key {
-        KeyCode::Tab | KeyCode::Esc => {
+        // Tab cierra la búsqueda y mantiene el menú actual
+        KeyCode::Tab => {
+            app.search_mode = false;
+        }
+        // Esc cancela la búsqueda: limpia el texto y vuelve al menú completo
+        KeyCode::Esc => {
             app.search_mode = false;
             app.search_text.clear();
+            app.state.select(Some(0));
         }
+        // Backspace: elimina carácter del filtro y reselecciona primer item
         KeyCode::Backspace => {
             app.search_text.pop();
             app.state.select(Some(0));
         }
+        // ↑ ↓: navegación en el menú filtrado
+        KeyCode::Up => {
+            let filtered = app.filtered_items();
+            if !filtered.is_empty() {
+                let current = app.state.selected().unwrap_or(0);
+                let next = if current == 0 { filtered.len() - 1 } else { current - 1 };
+                app.state.select(Some(next));
+            }
+        }
+        KeyCode::Down => {
+            let filtered = app.filtered_items();
+            if !filtered.is_empty() {
+                let current = app.state.selected().unwrap_or(0);
+                let next = (current + 1) % filtered.len();
+                app.state.select(Some(next));
+            }
+        }
+        // F2: toggle preview (funciona durante búsqueda)
         KeyCode::F(2) => app.show_preview = !app.show_preview,
+        // Enter: ejecuta el item filtrado seleccionado
         KeyCode::Enter => {
             let filtered = app.filtered_items();
             if !filtered.is_empty() {
-                app.state.select(Some(0));
                 if app.activate_item(terminal, &filtered)? {
                     return Ok(true);
                 }
             }
         }
+        // Cualquier otro carácter: agregar al filtro y resetear a primer item
         KeyCode::Char(c) => {
             app.search_text.push(c);
             app.state.select(Some(0));
         }
-
         _ => {}
     }
     Ok(false)

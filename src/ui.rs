@@ -9,6 +9,38 @@ use ratatui::{
 use crate::app::App;
 use crate::model::MenuAction;
 
+// ═══════════════════════════════════════════════════════════════
+// PALETA DE COLORES ELEGANTE Y COHERENTE
+// ═══════════════════════════════════════════════════════════════
+// Inspirada en interfaces modernas minimalistas con tonos sofisticados
+
+/// Color de bordes principal: azul grisáceo sutil
+const COLOR_BORDER_PRIMARY: Color = Color::Rgb(100, 130, 160);
+
+/// Color de bordes secundario: más oscuro, para énfasis
+const COLOR_BORDER_ACCENT: Color = Color::Rgb(80, 110, 150);
+
+/// Color de fondo para selección: azul profundo muy suave
+const COLOR_HIGHLIGHT_BG: Color = Color::Rgb(40, 60, 100);
+
+/// Color de texto resaltado: blanco con ligerísimo azul
+const COLOR_HIGHLIGHT_FG: Color = Color::Rgb(220, 230, 245);
+
+/// Color para búsqueda exitosa: verde agua sutil
+const COLOR_SEARCH_SUCCESS: Color = Color::Rgb(100, 170, 140);
+
+/// Color para búsqueda fallida: rojo suave
+const COLOR_SEARCH_FAIL: Color = Color::Rgb(200, 100, 110);
+
+/// Color para comandos/ejecutables: cyan sutil
+const COLOR_COMMAND: Color = Color::Rgb(120, 180, 200);
+
+/// Color para texto secundario/gris: neutro elegante
+const COLOR_SECONDARY: Color = Color::Rgb(140, 150, 170);
+
+// /// Color para errores y alertas: rojo moderno
+// const COLOR_ERROR: Color = Color::Rgb(210, 110, 120);
+
 /// Renderiza la interfaz completa en cada ciclo de dibujado.
 pub fn ui(f: &mut Frame, app: &mut App) {
     let items_to_render = app.filtered_items();
@@ -105,7 +137,7 @@ fn render_wizard(f: &mut Frame, app: &App) {
         .title_bottom(Line::from(" [Enter] Confirmar  [Esc] Cancelar ").centered())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::Yellow));
+        .border_style(Style::default().fg(COLOR_BORDER_ACCENT));
     f.render_widget(block, area);
 
     // Ancho disponible: ancho del popup menos márgenes y borde (popup_w - 4)
@@ -121,14 +153,8 @@ fn render_wizard(f: &mut Frame, app: &App) {
     };
 
     let cmd_widget = Paragraph::new(cmd_display)
-        .style(Style::default().fg(Color::DarkGray));
+        .style(Style::default().fg(COLOR_SECONDARY));
     f.render_widget(cmd_widget, inner[0]);
-
-
-    // // Línea de contexto: el comando original en gris
-    // let cmd_widget = Paragraph::new(cmd_preview)
-    //     .style(Style::default().fg(Color::DarkGray));
-    // f.render_widget(cmd_widget, inner[0]);
 
     // Label del campo actual: "Ingrese un nombre:"
     let summary: String = wizard.params[..wizard.current]
@@ -142,7 +168,7 @@ fn render_wizard(f: &mut Frame, app: &App) {
         format!("{} │ {}:", summary.trim_end(), param.label)
     };
     let label_widget = Paragraph::new(label_text)
-        .style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD));
+        .style(Style::default().fg(COLOR_HIGHLIGHT_FG).add_modifier(Modifier::BOLD));
     f.render_widget(label_widget, inner[1]);
 
     // Campo de input
@@ -151,9 +177,9 @@ fn render_wizard(f: &mut Frame, app: &App) {
             Block::default()
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(Color::White)),
+                .border_style(Style::default().fg(COLOR_COMMAND)),
         )
-        .style(Style::default().fg(Color::Yellow));
+        .style(Style::default().fg(COLOR_COMMAND));
     f.render_widget(input_widget, inner[2]);
 
     // Cursor dentro del campo de input
@@ -169,8 +195,6 @@ fn render_menu_list(
     area: Rect,
     title: &str,
 ) {
-    let border_color = Color::Cyan;
-
     let list_items: Vec<ListItem> = items_to_render
         .iter()
         .map(|item| {
@@ -184,9 +208,9 @@ fn render_menu_list(
         .collect();
 
     let depth_hint = if app.history.is_empty() {
-        String::from("[Ctrl+q] Salir")
+        String::from(" [Ctrl+q] Salir ")
     } else {
-        String::from("[<-] Volver [Ctrl+q] Salir")
+        String::from(" [<-] Volver [Ctrl+q] Salir ")
     };
 
     let list = List::new(list_items)
@@ -197,13 +221,13 @@ fn render_menu_list(
                 .title_bottom(Line::from(depth_hint).right_aligned())
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(border_color))
+                .border_style(Style::default().fg(COLOR_BORDER_PRIMARY))
                 .padding(Padding::new(0, 0, 1, 1)),
         )
         .highlight_style(
             Style::default()
-                .bg(Color::Blue)
-                .fg(Color::Yellow)
+                .bg(COLOR_HIGHLIGHT_BG)
+                .fg(COLOR_HIGHLIGHT_FG)
                 .add_modifier(Modifier::BOLD),
         )
         .highlight_symbol(" \u{27a4} "); // flecha
@@ -220,22 +244,37 @@ fn render_search_bar(f: &mut Frame, app: &App, area: Rect) {
     // Contar resultados reales (sin el fallback)
     let result_count = crate::search::filter_recursive(&app.current_items, &app.search_text, 0).len();
 
-
-    let (title, border_color) = if app.search_mode && result_count > 0 && !app.search_text.is_empty() {
-        (format!(" Buscar... ({}) ", result_count), Color::Yellow)
-    } else if app.search_mode && result_count <= 0 {
-        (String::from(" Buscar... "), Color::Red)
+    let (title, border_color, subtitle) = if result_count > 0 && !app.search_text.is_empty() {
+        (
+            format!(" 🔍 Búsqueda: {} resultados ", result_count),
+            COLOR_SEARCH_SUCCESS,
+            " [Tab] Cerrar  [Esc] Limpiar "
+        )
+    } else if app.search_text.is_empty() {
+        (
+            String::from(" 🔍 Búsqueda "),
+            COLOR_COMMAND,
+            " [Tab] Cerrar "
+        )
     } else {
-        (String::from(" [Tab] Buscar "),  Color::Yellow)
+        (
+            String::from(" 🔍 Sin resultados "),
+            COLOR_SEARCH_FAIL,
+            " [Esc] Limpiar  [Tab] Cerrar "
+        )
     };
 
-    let input_panel = Paragraph::new(app.search_text.as_str()).block(
-        Block::default()
-            .title(title)
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(border_color)),
-    );
+    let input_panel = Paragraph::new(app.search_text.as_str())
+        .block(
+            Block::default()
+                .title(title)
+                .title_alignment(Alignment::Center)
+                .title_bottom(Line::from(subtitle).right_aligned())
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(border_color)),
+        )
+        .style(Style::default().fg(COLOR_COMMAND));
 
     let cursor_x = area
         .x
@@ -257,14 +296,25 @@ fn render_preview_popup(
         return;
     }
 
+    // Solo mostrar preview si el item seleccionado es un comando ejecutable
+    let is_executable_command = app
+        .state
+        .selected()
+        .and_then(|i| items.get(i))
+        .map(|item| matches!(&item.action, MenuAction::Execute(_)))
+        .unwrap_or(false);
+
+    if !is_executable_command {
+        return;
+    }
+
     let cmd_text = app
         .state
         .selected()
         .and_then(|i| items.get(i))
-        .map(|item| match &item.action {
-            MenuAction::Execute(cmd) => format!("$ {}", cmd),
-            MenuAction::Quit => String::from("(salir)"),
-            MenuAction::OpenSubmenu(_) => String::from("(submenú)"),
+        .and_then(|item| match &item.action {
+            MenuAction::Execute(cmd) => Some(format!("$ {}", cmd)),
+            _ => None,
         })
         .unwrap_or_else(|| String::from("(sin selección)"));
 
@@ -299,10 +349,10 @@ fn render_preview_popup(
                 .title_alignment(Alignment::Center)
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(Color::Green))
+                .border_style(Style::default().fg(COLOR_COMMAND))
                 .padding(Padding::new(1, 1, 0, 0)),
         )
-        .style(Style::default().fg(Color::White));
+        .style(Style::default().fg(COLOR_HIGHLIGHT_FG));
 
     f.render_widget(popup, popup_area);
 }
@@ -312,12 +362,12 @@ fn render_help_modal(f: &mut Frame) {
     use ratatui::{text::Span, widgets::{Clear, Table, Row, Cell}};
 
     let shortcuts: &[(&str, &str)] = &[
-        ("↑ / ↓",       "Navegar ítems"),
+        ("↑ / ↓",       "Navegar ítems (↑↓ funciona en búsqueda)"),
         ("Enter / →",   "Seleccionar / entrar al submenú"),
-        ("Esc / ←",     "Volver al menú anterior"),
+        ("Esc / ←",     "Volver al menú anterior / limpiar búsqueda"),
         ("Inicio",      "Ir al menú raíz"),
-        ("Tab",         "Activar búsqueda"),
-        ("Tab (busq.)", "Salir de búsqueda"),
+        ("Tab",         "Activar / cerrar búsqueda"),
+        ("Buscar",      "Escribe para filtrar en vivo"),
         ("Ctrl+Q",      "Salir de la aplicación"),
         ("F2",          "Mostrar / ocultar vista previa"),
         ("F1",          "Mostrar / cerrar esta ayuda"),
@@ -329,7 +379,7 @@ fn render_help_modal(f: &mut Frame) {
             Row::new(vec![
                 Cell::from(Span::styled(
                     format!(" › {} ", key),
-                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                    Style::default().fg(COLOR_COMMAND).add_modifier(Modifier::BOLD),
                 )),
                 Cell::from(Span::raw(format!(" {} ", desc))),
             ])
@@ -338,7 +388,7 @@ fn render_help_modal(f: &mut Frame) {
 
     let table = Table::new(
         rows,
-        [Constraint::Length(18), Constraint::Min(28)],
+        [Constraint::Length(18), Constraint::Min(5q0)],
     )
     .block(
         Block::default()
@@ -347,7 +397,7 @@ fn render_help_modal(f: &mut Frame) {
             .title_bottom(Line::from(" [Esc] [F1] Cerrar ").right_aligned())
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(Color::Cyan)),
+            .border_style(Style::default().fg(COLOR_BORDER_PRIMARY)),
     )
     .column_spacing(1);
 
@@ -400,31 +450,31 @@ fn render_confirmation_modal(f: &mut Frame, app: &App) {
         .title_bottom(Line::from(" [Enter] Confirmar  [Esc] Cancelar ").centered())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::Yellow));
+        .border_style(Style::default().fg(COLOR_BORDER_ACCENT));
     f.render_widget(block, area);
 
     // Mostrar el comando
     let cmd_widget = Paragraph::new(cmd_display)
-        .style(Style::default().fg(Color::Cyan));
+        .style(Style::default().fg(COLOR_COMMAND));
     f.render_widget(cmd_widget, inner[0]);
 
     // Opciones: "[ Sí ]  [ No ]" con la selección destacada
     let si_style = if confirmation.selected == 0 {
         Style::default()
-            .bg(Color::Blue)
-            .fg(Color::Yellow)
+            .bg(COLOR_HIGHLIGHT_BG)
+            .fg(COLOR_HIGHLIGHT_FG)
             .add_modifier(Modifier::BOLD)
     } else {
-        Style::default().fg(Color::White)
+        Style::default().fg(COLOR_SECONDARY)
     };
 
     let no_style = if confirmation.selected == 1 {
         Style::default()
-            .bg(Color::Blue)
-            .fg(Color::Yellow)
+            .bg(COLOR_HIGHLIGHT_BG)
+            .fg(COLOR_HIGHLIGHT_FG)
             .add_modifier(Modifier::BOLD)
     } else {
-        Style::default().fg(Color::White)
+        Style::default().fg(COLOR_SECONDARY)
     };
 
     let options = vec![
