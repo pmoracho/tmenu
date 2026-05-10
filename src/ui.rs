@@ -38,6 +38,9 @@ const COLOR_COMMAND: Color = Color::Rgb(120, 180, 200);
 /// Color para texto secundario/gris: neutro elegante
 const COLOR_SECONDARY: Color = Color::Rgb(140, 150, 170);
 
+///Color para el dialogo de confirmación: naranja suave
+const COLOR_CONFIRMATION: Color = Color::Rgb(209, 85, 85);
+
 // /// Color para errores y alertas: rojo moderno
 // const COLOR_ERROR: Color = Color::Rgb(210, 110, 120);
 
@@ -62,7 +65,8 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     // no de current_items. Usar chars().count() para ancho visual correcto con Unicode.
     let title_w = title.chars().count();
     // Dimensiones basadas en current_items para que el box no salte al filtrar
-    let max_label_w = app.current_items
+    let max_label_w = app
+        .current_items
         .iter()
         .map(|item| item.label.chars().count())
         .max()
@@ -129,7 +133,6 @@ fn render_wizard(f: &mut Frame, app: &App) {
         .margin(1)
         .split(area);
 
-
     // Bloque contenedor
     let block = Block::default()
         .title(title)
@@ -146,14 +149,16 @@ fn render_wizard(f: &mut Frame, app: &App) {
 
     let cmd_display = if cmd_str.chars().count() > available_w {
         // Truncar dejando espacio para "..."
-        let truncated: String = cmd_str.chars().take(available_w.saturating_sub(3)).collect();
+        let truncated: String = cmd_str
+            .chars()
+            .take(available_w.saturating_sub(3))
+            .collect();
         format!("{}...", truncated)
     } else {
         cmd_str
     };
 
-    let cmd_widget = Paragraph::new(cmd_display)
-        .style(Style::default().fg(COLOR_SECONDARY));
+    let cmd_widget = Paragraph::new(cmd_display).style(Style::default().fg(COLOR_SECONDARY));
     f.render_widget(cmd_widget, inner[0]);
 
     // Label del campo actual: "Ingrese un nombre:"
@@ -167,8 +172,11 @@ fn render_wizard(f: &mut Frame, app: &App) {
     } else {
         format!("{} │ {}:", summary.trim_end(), param.label)
     };
-    let label_widget = Paragraph::new(label_text)
-        .style(Style::default().fg(COLOR_HIGHLIGHT_FG).add_modifier(Modifier::BOLD));
+    let label_widget = Paragraph::new(label_text).style(
+        Style::default()
+            .fg(COLOR_HIGHLIGHT_FG)
+            .add_modifier(Modifier::BOLD),
+    );
     f.render_widget(label_widget, inner[1]);
 
     // Campo de input
@@ -242,25 +250,26 @@ fn render_search_bar(f: &mut Frame, app: &App, area: Rect) {
     }
 
     // Contar resultados reales (sin el fallback)
-    let result_count = crate::search::filter_recursive(&app.current_items, &app.search_text, 0).len();
+    let result_count =
+        crate::search::filter_recursive(&app.current_items, &app.search_text, 0).len();
 
     let (title, border_color, subtitle) = if result_count > 0 && !app.search_text.is_empty() {
         (
             format!(" 🔍 Búsqueda: {} resultados ", result_count),
             COLOR_SEARCH_SUCCESS,
-            " [Tab] Cerrar  [Esc] Limpiar "
+            " [Tab] Cerrar  [Esc] Limpiar ",
         )
     } else if app.search_text.is_empty() {
         (
             String::from(" 🔍 Búsqueda "),
             COLOR_COMMAND,
-            " [Tab] Cerrar "
+            " [Tab] Cerrar ",
         )
     } else {
         (
             String::from(" 🔍 Sin resultados "),
             COLOR_SEARCH_FAIL,
-            " [Esc] Limpiar  [Tab] Cerrar "
+            " [Esc] Limpiar  [Tab] Cerrar ",
         )
     };
 
@@ -359,18 +368,21 @@ fn render_preview_popup(
 
 /// Ventana de ayuda bloqueante con todos los atajos de teclado.
 fn render_help_modal(f: &mut Frame) {
-    use ratatui::{text::Span, widgets::{Clear, Table, Row, Cell}};
+    use ratatui::{
+        text::Span,
+        widgets::{Cell, Clear, Row, Table},
+    };
 
     let shortcuts: &[(&str, &str)] = &[
-        ("↑ / ↓",       "Navegar ítems (↑↓ funciona en búsqueda)"),
-        ("Enter / →",   "Seleccionar / entrar al submenú"),
-        ("Esc / ←",     "Volver al menú anterior / limpiar búsqueda"),
-        ("Inicio",      "Ir al menú raíz"),
-        ("Tab",         "Activar / cerrar búsqueda"),
-        ("Buscar",      "Escribe para filtrar en vivo"),
-        ("Ctrl+Q",      "Salir de la aplicación"),
-        ("F2",          "Mostrar / ocultar vista previa"),
-        ("F1",          "Mostrar / cerrar esta ayuda"),
+        ("↑ / ↓", "Navegar ítems (↑↓ funciona en búsqueda)"),
+        ("Enter / →", "Seleccionar / entrar al submenú"),
+        ("Esc / ←", "Volver al menú anterior / limpiar búsqueda"),
+        ("Inicio", "Ir al menú raíz"),
+        ("Tab", "Activar / cerrar búsqueda"),
+        ("Buscar", "Escribe para filtrar en vivo"),
+        ("Ctrl+Q", "Salir de la aplicación"),
+        ("F2", "Mostrar / ocultar vista previa"),
+        ("F1", "Mostrar / cerrar esta ayuda"),
     ];
 
     let rows: Vec<Row> = shortcuts
@@ -379,27 +391,26 @@ fn render_help_modal(f: &mut Frame) {
             Row::new(vec![
                 Cell::from(Span::styled(
                     format!(" › {} ", key),
-                    Style::default().fg(COLOR_COMMAND).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(COLOR_COMMAND)
+                        .add_modifier(Modifier::BOLD),
                 )),
                 Cell::from(Span::raw(format!(" {} ", desc))),
             ])
         })
         .collect();
 
-    let table = Table::new(
-        rows,
-        [Constraint::Length(18), Constraint::Min(50)],
-    )
-    .block(
-        Block::default()
-            .title(" Ayuda — Atajos de teclado ")
-            .title_alignment(Alignment::Center)
-            .title_bottom(Line::from(" [Esc] [F1] Cerrar ").right_aligned())
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(COLOR_BORDER_PRIMARY)),
-    )
-    .column_spacing(1);
+    let table = Table::new(rows, [Constraint::Length(18), Constraint::Min(50)])
+        .block(
+            Block::default()
+                .title(" Ayuda — Atajos de teclado ")
+                .title_alignment(Alignment::Center)
+                .title_bottom(Line::from(" [Esc] [F1] Cerrar ").right_aligned())
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(COLOR_BORDER_PRIMARY)),
+        )
+        .column_spacing(1);
 
     let popup_w: u16 = 60;
     let popup_h: u16 = shortcuts.len() as u16 + 2; // filas + bordes + padding
@@ -407,28 +418,32 @@ fn render_help_modal(f: &mut Frame) {
 
     f.render_widget(Clear, area);
     f.render_widget(table, area);
-
 }
 
 /// Modal de confirmación: muestra el comando y opciones Sí/No con navegación.
 fn render_confirmation_modal(f: &mut Frame, app: &App) {
-    use ratatui::widgets::Clear;
     use ratatui::text::Span;
+    use ratatui::widgets::Clear;
 
-    let Some(confirmation) = &app.confirmation else { return };
+    let Some(confirmation) = &app.confirmation else {
+        return;
+    };
 
     // Truncar comando muy largo
     let cmd_text = &confirmation.cmd;
     let max_cmd_width = 50;
     let cmd_display = if cmd_text.chars().count() > max_cmd_width {
-        let truncated: String = cmd_text.chars().take(max_cmd_width.saturating_sub(3)).collect();
+        let truncated: String = cmd_text
+            .chars()
+            .take(max_cmd_width.saturating_sub(3))
+            .collect();
         format!("{}...", truncated)
     } else {
         cmd_text.clone()
     };
 
     let popup_w: u16 = 64;
-    let popup_h: u16 = 10; // título + cmd + separador + opciones + bordes + padding
+    let popup_h: u16 = 8; // título + cmd + separador + opciones + bordes + padding
     let area = centered_rect(popup_w, popup_h, f.area());
 
     f.render_widget(Clear, area);
@@ -450,28 +465,27 @@ fn render_confirmation_modal(f: &mut Frame, app: &App) {
         .title_bottom(Line::from(" [Enter] Confirmar  [Esc] Cancelar ").centered())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(COLOR_BORDER_ACCENT));
+        .border_style(Style::default().fg(COLOR_CONFIRMATION));
     f.render_widget(block, area);
 
     // Mostrar el comando
-    let cmd_widget = Paragraph::new(cmd_display)
-        .style(Style::default().fg(COLOR_COMMAND));
+    let cmd_widget = Paragraph::new(cmd_display).style(Style::default().fg(COLOR_COMMAND));
     f.render_widget(cmd_widget, inner[0]);
 
     // Opciones: "[ Sí ]  [ No ]" con la selección destacada
     let si_style = if confirmation.selected == 0 {
         Style::default()
             .bg(COLOR_HIGHLIGHT_BG)
-            .fg(COLOR_HIGHLIGHT_FG)
+            .fg(COLOR_CONFIRMATION)
             .add_modifier(Modifier::BOLD)
     } else {
-        Style::default().fg(COLOR_SECONDARY)
+        Style::default().fg(COLOR_CONFIRMATION)
     };
 
     let no_style = if confirmation.selected == 1 {
         Style::default()
             .bg(COLOR_HIGHLIGHT_BG)
-            .fg(COLOR_HIGHLIGHT_FG)
+            .fg(COLOR_CONFIRMATION)
             .add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(COLOR_SECONDARY)
@@ -480,11 +494,10 @@ fn render_confirmation_modal(f: &mut Frame, app: &App) {
     let options = vec![
         Span::styled("  [ Sí ]  ", si_style),
         Span::raw("     "),
-        Span::styled("[ No ]  ", no_style),
+        Span::styled("  [ No ]  ", no_style),
     ];
 
-    let options_widget = Paragraph::new(Line::from(options))
-        .alignment(Alignment::Center);
+    let options_widget = Paragraph::new(Line::from(options)).alignment(Alignment::Center);
     f.render_widget(options_widget, inner[2]);
 }
 

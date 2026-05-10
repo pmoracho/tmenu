@@ -16,15 +16,19 @@ impl fmt::Display for AppError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             AppError::MenuFileNotFound(path) => {
-                write!(f, "El archivo de menú no fue encontrado: {}", path.display())
+                write!(
+                    f,
+                    "El archivo de menú no fue encontrado: {}\n",
+                    path.display()
+                )
             }
-            AppError::IoError(e) => write!(f, "Error de I/O: {}", e),
-            AppError::TerminalError(msg) => write!(f, "Error de terminal: {}", msg),
+            AppError::IoError(e) => write!(f, "Error de I/O: {}\n", e),
+            AppError::TerminalError(msg) => write!(f, "Error de terminal: {}\n", msg),
             AppError::ForbiddenCommand(c) => {
-                write!(f, "El comando contiene caracteres no permitidos: '{}'", c)
+                write!(f, "El comando contiene caracteres no permitidos: '{}'\n", c)
             }
-            AppError::EventError(msg) => write!(f, "Error de evento de terminal: {}", msg),
-            AppError::HistoryError(msg) => write!(f, "Error al guardar historial: {}", msg),
+            AppError::EventError(msg) => write!(f, "Error de evento de terminal: {}\n", msg),
+            AppError::HistoryError(msg) => write!(f, "Error al guardar historial: {}\n", msg),
         }
     }
 }

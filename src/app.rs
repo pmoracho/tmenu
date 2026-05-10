@@ -1,20 +1,20 @@
-use ratatui::{Terminal, backend::{CrosstermBackend}, widgets::ListState};
+use ratatui::{Terminal, backend::CrosstermBackend, widgets::ListState};
 
 use crossterm::{
-    execute,
-    terminal::{
-        EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
-    },
     event::DisableMouseCapture,
     event::EnableMouseCapture,
+    execute,
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use std::io::{self, Stdout};
 use std::process::Command;
 
-use crate::{error::AppError, parser, history};
-use crate::model::{HistoryEntry, MenuAction, MenuItem, CommandParam, ConfirmationState, ExecutionMode};
+use crate::model::{
+    CommandParam, ConfirmationState, ExecutionMode, HistoryEntry, MenuAction, MenuItem,
+};
 use crate::parser::parse_toon_file;
 use crate::search::{filter_recursive, find_first_command};
+use crate::{error::AppError, history, parser};
 
 /// Estado principal de la aplicación TUI.
 pub struct App {
@@ -171,7 +171,11 @@ impl App {
                     }
                 } else {
                     // Con interpolación: iniciar wizard (no ejecutar todavía)
-                    self.wizard = Some(WizardState::new(params, cmd.to_string(), item.require_confirmation));
+                    self.wizard = Some(WizardState::new(
+                        params,
+                        cmd.to_string(),
+                        item.require_confirmation,
+                    ));
                 }
             }
             MenuAction::OpenSubmenu(sub_items) => {
@@ -235,9 +239,8 @@ impl App {
             let _ = std::process::Command::new("clear").spawn();
         }
 
-        let parts: Vec<String> = shlex::split(cmd).unwrap_or_else(|| {
-            cmd.split_whitespace().map(str::to_string).collect()
-        });
+        let parts: Vec<String> = shlex::split(cmd)
+            .unwrap_or_else(|| cmd.split_whitespace().map(str::to_string).collect());
 
         if let Some((bin, args)) = parts.split_first() {
             let mut command = Command::new(bin);
@@ -309,9 +312,8 @@ impl App {
 
         // Parsear respetando quoting ("arg con espacios" se trata como un solo arg).
         // Fallback a split_whitespace si shlex falla (comillas desbalanceadas, etc).
-        let parts: Vec<String> = shlex::split(cmd).unwrap_or_else(|| {
-            cmd.split_whitespace().map(str::to_string).collect()
-        });
+        let parts: Vec<String> = shlex::split(cmd)
+            .unwrap_or_else(|| cmd.split_whitespace().map(str::to_string).collect());
 
         if let Some((bin, args)) = parts.split_first() {
             let mut command = Command::new(bin);
@@ -406,14 +408,15 @@ impl App {
             return false;
         }
         // Allowlist de caracteres válidos (extendida respecto al original)
-        cmd.chars().all(|c| matches!(c,
-            'a'..='z' | 'A'..='Z' | '0'..='9'
-            | ' ' | '.' | '/' | '_' | '-' | '='
-            | ':' | '@' | '+' | '%' | '~' | ','
-            | '\'' | '"'
-        ))
+        cmd.chars().all(|c| {
+            matches!(c,
+                'a'..='z' | 'A'..='Z' | '0'..='9'
+                | ' ' | '.' | '/' | '_' | '-' | '='
+                | ':' | '@' | '+' | '%' | '~' | ','
+                | '\'' | '"'
+            )
+        })
     }
-
 }
 
 /// Estado del wizard de interpolación de parámetros.
@@ -471,5 +474,4 @@ impl WizardState {
         }
         cmd
     }
-
 }

@@ -1,14 +1,15 @@
+use chrono::Local;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
-use chrono::Local;
 
 use crate::error::AppError;
 
 /// Retorna la ruta al archivo de historial: `~/.local/share/tmenu/history.log`
 fn history_file_path() -> Result<PathBuf, AppError> {
-    let home = dirs::home_dir()
-        .ok_or_else(|| AppError::HistoryError("No se pudo determinar el directorio home".to_string()))?;
+    let home = dirs::home_dir().ok_or_else(|| {
+        AppError::HistoryError("No se pudo determinar el directorio home".to_string())
+    })?;
     Ok(home.join(".local/share/tmenu/history.log"))
 }
 
@@ -16,7 +17,8 @@ fn history_file_path() -> Result<PathBuf, AppError> {
 /// Si no existe, lo crea con permisos estándar (0o755).
 fn ensure_history_dir() -> Result<(), AppError> {
     let history_path = history_file_path()?;
-    let dir = history_path.parent()
+    let dir = history_path
+        .parent()
         .ok_or_else(|| AppError::HistoryError("Ruta de historial inválida".to_string()))?;
 
     if !dir.exists() {
@@ -60,7 +62,10 @@ mod tests {
         let path = history_file_path();
         assert!(path.is_ok());
         let p = path.unwrap();
-        assert!(p.to_string_lossy().contains(".local/share/tmenu/history.log"));
+        assert!(
+            p.to_string_lossy()
+                .contains(".local/share/tmenu/history.log")
+        );
     }
 
     #[test]

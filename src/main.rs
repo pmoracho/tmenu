@@ -1,11 +1,11 @@
 /// Lector de menus interactivos TUI en Rust utilizando Ratatui y Clap.
 mod app;
 mod error;
+mod history;
 mod model;
 mod parser;
 mod search;
 mod ui;
-mod history;
 
 use app::App;
 use error::AppError;
@@ -38,7 +38,7 @@ struct Args {
 }
 
 fn main() {
-   // registrar un hook de pánico:
+    // registrar un hook de pánico:
     let original_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         let _ = disable_raw_mode();
@@ -54,15 +54,14 @@ fn main() {
 }
 
 fn run() -> Result<(), AppError> {
-
     let args = Args::parse();
 
-    let mut app = App::from_toon(&args.menu_file, args.debug)
-        .map_err(|e| match e {
-            AppError::IoError(ref io) if io.kind() == io::ErrorKind::NotFound =>
-                AppError::MenuFileNotFound(args.menu_file.clone()),
-            other => other,
-        })?;
+    let mut app = App::from_toon(&args.menu_file, args.debug).map_err(|e| match e {
+        AppError::IoError(ref io) if io.kind() == io::ErrorKind::NotFound => {
+            AppError::MenuFileNotFound(args.menu_file.clone())
+        }
+        other => other,
+    })?;
 
     enable_raw_mode().map_err(|e| AppError::TerminalError(e.to_string()))?;
     let mut stdout = io::stdout();
@@ -107,7 +106,7 @@ fn run_app(
             }
             if key.code == KeyCode::F(1) {
                 app.show_help = true;
-                let quit = run_help_modal(terminal, app)?;  // ← ahora retorna bool
+                let quit = run_help_modal(terminal, app)?; // ← ahora retorna bool
                 if quit {
                     return Ok(());
                 }
@@ -150,9 +149,7 @@ fn run_help_modal(
             .draw(|f| ui::ui(f, app))
             .map_err(|e| AppError::TerminalError(e.to_string()))?;
 
-        if let Event::Key(key) = event::read()
-            .map_err(|e| AppError::EventError(e.to_string()))?
-        {
+        if let Event::Key(key) = event::read().map_err(|e| AppError::EventError(e.to_string()))? {
             if key.kind != event::KeyEventKind::Press {
                 continue;
             }
@@ -161,9 +158,7 @@ fn run_help_modal(
                     app.show_help = false;
                     return Ok(false); // cerrar ayuda, continuar app
                 }
-                KeyCode::Char('q')
-                    if key.modifiers.contains(event::KeyModifiers::CONTROL) =>
-                {
+                KeyCode::Char('q') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
                     return Ok(true); // salir de la app
                 }
                 _ => {}
@@ -183,9 +178,7 @@ fn run_wizard(
             .draw(|f| ui::ui(f, app))
             .map_err(|e| AppError::TerminalError(e.to_string()))?;
 
-        if let Event::Key(key) = event::read()
-            .map_err(|e| AppError::EventError(e.to_string()))?
-        {
+        if let Event::Key(key) = event::read().map_err(|e| AppError::EventError(e.to_string()))? {
             if key.kind != event::KeyEventKind::Press {
                 continue;
             }
@@ -215,7 +208,8 @@ fn run_wizard(
                     }
                 }
                 KeyCode::Enter => {
-                    let done = app.wizard
+                    let done = app
+                        .wizard
                         .as_mut()
                         .map(|w| w.confirm_current())
                         .unwrap_or(true);
@@ -233,8 +227,6 @@ fn run_wizard(
     }
 }
 
-
-
 /// Loop bloqueante del modal de confirmación.
 /// Retorna true si el usuario confirmó (Sí), false si canceló (No).
 pub fn run_confirmation_modal(
@@ -246,9 +238,7 @@ pub fn run_confirmation_modal(
             .draw(|f| ui::ui(f, app))
             .map_err(|e| AppError::TerminalError(e.to_string()))?;
 
-        if let Event::Key(key) = event::read()
-            .map_err(|e| AppError::EventError(e.to_string()))?
-        {
+        if let Event::Key(key) = event::read().map_err(|e| AppError::EventError(e.to_string()))? {
             if key.kind != event::KeyEventKind::Press {
                 continue;
             }
@@ -267,7 +257,8 @@ pub fn run_confirmation_modal(
                 }
                 // Enter confirma la selección actual
                 KeyCode::Enter => {
-                    let confirmed = app.confirmation
+                    let confirmed = app
+                        .confirmation
                         .as_ref()
                         .map(|c| c.is_confirmed())
                         .unwrap_or(false);
@@ -286,7 +277,8 @@ pub fn run_confirmation_modal(
                 }
                 // Ctrl+Q cancela y sale de la app
                 _ if key.modifiers.contains(event::KeyModifiers::CONTROL)
-                    && key.code == KeyCode::Char('q') => {
+                    && key.code == KeyCode::Char('q') =>
+                {
                     app.confirmation = None;
                     return Err(AppError::EventError("Cancelado por Ctrl+Q".to_string()));
                 }
@@ -325,7 +317,11 @@ fn handle_search_mode(
             let filtered = app.filtered_items();
             if !filtered.is_empty() {
                 let current = app.state.selected().unwrap_or(0);
-                let next = if current == 0 { filtered.len() - 1 } else { current - 1 };
+                let next = if current == 0 {
+                    filtered.len() - 1
+                } else {
+                    current - 1
+                };
                 app.state.select(Some(next));
             }
         }

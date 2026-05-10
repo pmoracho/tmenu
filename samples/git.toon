@@ -2,6 +2,9 @@
 # [Ctrl+q] Salir
 # [tab] Buscar
 # [<-|->] Navegar
+config:
+    execution_mode: clean
+
 "Git":
   Repositorio:
     "Inicializar repo": git init
@@ -11,7 +14,7 @@
     "Ver ramas": git branch -a
     "Ver remotos": git remote -v
   "Staging y Commits":
-    "Agregar todo": git add .
+    "Agregar todo": git add . [confirm=true]
     "Agregar interactivo": git add -p
     "Commit": git commit
     "Commit con mensaje": git commit -m "WIP"

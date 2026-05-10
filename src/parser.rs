@@ -2,8 +2,8 @@ use std::fs;
 use std::path::Path;
 
 use crate::error::AppError;
-use crate::model::{MenuAction, MenuItem, ExecutionMode};
 use crate::model::CommandParam;
+use crate::model::{ExecutionMode, MenuAction, MenuItem};
 
 /// Configuración global del menú extraída del archivo `.toon`.
 #[derive(Clone, Debug)]
@@ -80,15 +80,15 @@ pub fn parse_toon_file(path: &Path) -> Result<(GlobalConfig, String, Vec<MenuIte
             indent_levels.push(raw_indent);
             indent_levels.sort_unstable();
         }
-        let level = indent_levels.iter().position(|&x| x == raw_indent).unwrap_or(0);
+        let level = indent_levels
+            .iter()
+            .position(|&x| x == raw_indent)
+            .unwrap_or(0);
 
         // Titulo principal (nivel 0, termina en ':' fuera de comillas)
         if level == 0 && ends_with_separator_colon(trimmed) {
             let pos = find_separator_colon(trimmed).unwrap();
-            main_title = trimmed[..pos]
-                .trim_matches('"')
-                .trim()
-                .to_string();
+            main_title = trimmed[..pos].trim_matches('"').trim().to_string();
             continue;
         }
 
@@ -147,7 +147,9 @@ fn extract_confirm_flag(s: &str) -> (&str, bool) {
     if let Some(bracket_pos) = s.rfind('[') {
         let rest = &s[bracket_pos..];
         if rest.starts_with("[confirm=") {
-            let inner = rest.strip_prefix("[confirm=").and_then(|s| s.strip_suffix("]"));
+            let inner = rest
+                .strip_prefix("[confirm=")
+                .and_then(|s| s.strip_suffix("]"));
             if let Some(flag_str) = inner {
                 let flag_str = flag_str.trim();
                 let line_without_flag = s[..bracket_pos].trim();
