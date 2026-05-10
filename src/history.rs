@@ -54,8 +54,6 @@ pub fn log_command(cmd: &str) -> Result<(), AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
-    use tempfile::TempDir;
 
     #[test]
     fn test_history_file_path() {

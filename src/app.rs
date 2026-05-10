@@ -12,7 +12,7 @@ use std::io::{self, Stdout};
 use std::process::Command;
 
 use crate::{error::AppError, parser, history};
-use crate::model::{HistoryEntry, MenuAction, MenuItem, CommandParam, ConfirmationState};
+use crate::model::{HistoryEntry, MenuAction, MenuItem, CommandParam, ConfirmationState, ExecutionMode};
 use crate::parser::parse_toon_file;
 use crate::search::{filter_recursive, find_first_command};
 
@@ -33,12 +33,14 @@ pub struct App {
     pub wizard: Option<WizardState>,
     /// Modal de confirmación: Some(cmd) = usuario debe confirmar; None = no hay confirmación pendiente
     pub confirmation: Option<ConfirmationState>,
+    /// Modo de ejecución global (Clean o Inherit)
+    pub execution_mode: ExecutionMode,
 }
 
 impl App {
     /// Crea una instancia de `App` cargando el menú desde un archivo `.toon`.
     pub fn from_toon(path: &std::path::Path, debug: bool) -> Result<Self, AppError> {
-        let (main_title, root_items) = parse_toon_file(path)?;
+        let (config, main_title, root_items) = parse_toon_file(path)?;
 
         let mut state = ListState::default();
         state.select(Some(0));
@@ -57,6 +59,7 @@ impl App {
             debug,
             wizard: None,
             confirmation: None,
+            execution_mode: config.execution_mode,
         })
     }
 
@@ -210,6 +213,7 @@ impl App {
     }
 
     /// Ejecuta un comando externo SIN pedir confirmación.
+    /// Si `execution_mode` es `Clean`, ejecuta `clear` antes del comando.
     /// (Usado internamente después de que el usuario confirma).
     fn execute_command_internal(
         &self,
@@ -226,8 +230,11 @@ impl App {
             eprintln!("[warn] no se pudo restaurar la terminal: {}", e);
         }
 
-        // Parsear respetando quoting ("arg con espacios" se trata como un solo arg).
-        // Fallback a split_whitespace si shlex falla (comillas desbalanceadas, etc).
+        // Si el modo es Clean, limpiar pantalla antes de ejecutar
+        if self.execution_mode == crate::model::ExecutionMode::Clean {
+            let _ = std::process::Command::new("clear").spawn();
+        }
+
         let parts: Vec<String> = shlex::split(cmd).unwrap_or_else(|| {
             cmd.split_whitespace().map(str::to_string).collect()
         });
@@ -266,6 +273,7 @@ impl App {
 
     /// Ejecuta un comando externo en el shell del sistema operativo.
     ///
+    /// Si `execution_mode` es `Clean`, ejecuta `clear` antes del comando.
     /// Antes de ejecutar, restaura la terminal a modo normal y la reconfigura
     /// en modo TUI al finalizar.
     ///
@@ -292,6 +300,11 @@ impl App {
         let _ = disable_raw_mode();
         if let Err(e) = execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture) {
             eprintln!("[warn] no se pudo restaurar la terminal: {}", e);
+        }
+
+        // Si el modo es Clean, limpiar pantalla antes de ejecutar
+        if self.execution_mode == crate::model::ExecutionMode::Clean {
+            let _ = std::process::Command::new("clear").spawn();
         }
 
         // Parsear respetando quoting ("arg con espacios" se trata como un solo arg).
@@ -460,4 +473,3 @@ impl WizardState {
     }
 
 }
-

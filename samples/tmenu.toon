@@ -2,6 +2,9 @@
 # [Ctrl+q] Salir
 # [tab] Buscar
 # [<-|->] Navegar
+config:
+    execution_mode: clean
+
 "Rust Project":
   Información:
     "Versión de cargo": cargo --version

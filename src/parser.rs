@@ -2,26 +2,38 @@ use std::fs;
 use std::path::Path;
 
 use crate::error::AppError;
-use crate::model::{MenuAction, MenuItem};
+use crate::model::{MenuAction, MenuItem, ExecutionMode};
 use crate::model::CommandParam;
 
-/// Carga y parsea un archivo `.toon`, retornando el titulo principal
-/// y la lista de items del menu raiz.
-pub fn parse_toon_file(path: &Path) -> Result<(String, Vec<MenuItem>), AppError> {
-    let content = fs::read_to_string(path)?;
-    let mut main_title = String::from("Menu Principal");
+/// Configuración global del menú extraída del archivo `.toon`.
+#[derive(Clone, Debug)]
+pub struct GlobalConfig {
+    /// Modo de ejecución: limpiar pantalla o usar la actual
+    pub execution_mode: ExecutionMode,
+}
 
-    // Pila: (nombre_submenu, items_acumulados, nivel_normalizado)
-    // El nivel es el indice en el vector de niveles vistos, NO bytes de indentacion.
+impl Default for GlobalConfig {
+    fn default() -> Self {
+        GlobalConfig {
+            execution_mode: ExecutionMode::Inherit,
+        }
+    }
+}
+
+/// Carga y parsea un archivo `.toon`, retornando la configuración global,
+/// el titulo principal y la lista de items del menu raiz.
+pub fn parse_toon_file(path: &Path) -> Result<(GlobalConfig, String, Vec<MenuItem>), AppError> {
+    let content = fs::read_to_string(path)?;
+
+    let mut config = GlobalConfig::default();
+    let mut main_title = String::from("Menu Principal");
     let mut stack: Vec<(String, Vec<MenuItem>, usize)> = Vec::new();
     let mut root_items: Vec<MenuItem> = Vec::new();
-
-    // Tabla de niveles de indentacion vistos, en orden de aparicion.
-    // Permite comparar jerarquia independientemente de si se usan tabs o espacios.
     let mut indent_levels: Vec<usize> = Vec::new();
 
+    let mut config_base_indent: Option<usize> = None;
+
     for line in content.lines() {
-        // Normalizar: reemplazar tabs por 4 espacios para medir indentacion consistente
         let normalized = line.replace('\t', "    ");
         if normalized.trim().is_empty() {
             continue;
@@ -30,12 +42,44 @@ pub fn parse_toon_file(path: &Path) -> Result<(String, Vec<MenuItem>), AppError>
         let raw_indent = normalized.len() - normalized.trim_start().len();
         let trimmed = normalized.trim();
 
+        // ========== PARSING DE CONFIGURACIÓN ==========
+        if trimmed.starts_with("config:") {
+            config_base_indent = Some(raw_indent);
+            continue;
+        }
+
+        // Si estamos en la sección de configuración (hay config_base_indent)
+        if let Some(config_indent) = config_base_indent {
+            // Si encontramos una línea indentada bajo config: con ":", es una opción
+            if raw_indent > config_indent && trimmed.contains(':') && !trimmed.ends_with(':') {
+                // Parsear: "execution_mode: clean"
+                if let Some(pos) = trimmed.find(':') {
+                    let key = trimmed[..pos].trim();
+                    let value = trimmed[pos + 1..].trim();
+
+                    match key {
+                        "execution_mode" => {
+                            config.execution_mode = ExecutionMode::from_str(value);
+                        }
+                        _ => {}
+                    }
+                }
+                continue;
+            }
+
+            // Si encontramos algo al mismo nivel o menor que config:, salimos de la sección
+            if raw_indent <= config_indent && !trimmed.starts_with("config") {
+                config_base_indent = None;
+            }
+        }
+
+        // ========== PARSING DEL MENÚ ==========
+
         // Registrar el nivel de indentacion si es nuevo
         if !indent_levels.contains(&raw_indent) {
             indent_levels.push(raw_indent);
             indent_levels.sort_unstable();
         }
-        // Nivel normalizado: posicion en el vector de niveles conocidos (0, 1, 2, ...)
         let level = indent_levels.iter().position(|&x| x == raw_indent).unwrap_or(0);
 
         // Titulo principal (nivel 0, termina en ':' fuera de comillas)
@@ -92,17 +136,12 @@ pub fn parse_toon_file(path: &Path) -> Result<(String, Vec<MenuItem>), AppError>
         pop_and_insert(&mut stack, &mut root_items);
     }
 
-    Ok((main_title, root_items))
+    Ok((config, main_title, root_items))
 }
 
 /// Extrae la flag [confirm=true/false] de una línea si existe.
 /// Retorna (línea sin flag, require_confirmation).
-/// Default: true (seguro por defecto).
-///
-/// Ejemplos:
-///   `"Item": "cmd" [confirm=false]` -> ("Item": "cmd", false)
-///   `"Item": "cmd"` -> ("Item": "cmd", true)
-///   `"Item": "cmd" [confirm=true]` -> ("Item": "cmd", true)
+/// Default: false (no confirmación por defecto, pero puede ser true).
 fn extract_confirm_flag(s: &str) -> (&str, bool) {
     // Buscar [confirm=...] al final
     if let Some(bracket_pos) = s.rfind('[') {
@@ -125,6 +164,8 @@ fn extract_confirm_flag(s: &str) -> (&str, bool) {
     // No hay flag, default a false
     (s, false)
 }
+
+/// Busca el ':' separador fuera de comillas en una cadena.
 ///
 /// Ejemplos:
 ///   `"Nivel 1":` -> Some(9)
@@ -158,7 +199,7 @@ fn pop_and_insert(stack: &mut Vec<(String, Vec<MenuItem>, usize)>, root: &mut Ve
         let submenu = MenuItem {
             label: name,
             action: MenuAction::OpenSubmenu(items),
-            require_confirmation: false, // por defecto los submenus no requieren confirmación
+            require_confirmation: false,
         };
 
         if let Some(parent) = stack.last_mut() {
@@ -229,7 +270,7 @@ mod tests {
     fn test_extract_confirm_flag_missing() {
         let (line, flag) = extract_confirm_flag("cmd");
         assert_eq!(line, "cmd");
-        assert!(flag); // default true
+        assert!(!flag); // default false
     }
 
     #[test]
@@ -244,5 +285,20 @@ mod tests {
         let (line, flag) = extract_confirm_flag("\"echo hola\" [confirm=false]");
         assert_eq!(line, "\"echo hola\"");
         assert!(!flag);
+    }
+
+    #[test]
+    fn test_execution_mode_from_str_clean() {
+        assert_eq!(ExecutionMode::from_str("clean"), ExecutionMode::Clean);
+    }
+
+    #[test]
+    fn test_execution_mode_from_str_inherit() {
+        assert_eq!(ExecutionMode::from_str("inherit"), ExecutionMode::Inherit);
+    }
+
+    #[test]
+    fn test_execution_mode_from_str_default() {
+        assert_eq!(ExecutionMode::from_str("unknown"), ExecutionMode::Inherit);
     }
 }

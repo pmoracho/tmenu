@@ -1,5 +1,24 @@
 use ratatui::widgets::ListState;
 
+/// Modo de ejecución de comandos.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ExecutionMode {
+    /// Ejecutar en la pantalla actual (default)
+    Inherit,
+    /// Limpiar pantalla antes de ejecutar (mejor para visualizar salida)
+    Clean,
+}
+
+impl ExecutionMode {
+    /// Parsea un string al modo correspondiente
+    pub fn from_str(s: &str) -> Self {
+        match s.to_lowercase().trim() {
+            "clean" => ExecutionMode::Clean,
+            _ => ExecutionMode::Inherit, // default
+        }
+    }
+}
+
 /// Acción asociada a cada ítem del menú.
 #[derive(Clone)]
 pub enum MenuAction {

@@ -388,7 +388,7 @@ fn render_help_modal(f: &mut Frame) {
 
     let table = Table::new(
         rows,
-        [Constraint::Length(18), Constraint::Min(5q0)],
+        [Constraint::Length(18), Constraint::Min(50)],
     )
     .block(
         Block::default()
