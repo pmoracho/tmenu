@@ -105,7 +105,7 @@ main() {
 
     # 8. Ejecutar tests
     log_info "[7/12] Ejecutando tests..."
-    if ! cargo test --lib 2>&1 | tail -3; then
+    if ! cargo test 2>&1 | tail -3; then
         die "Fallo en tests"
     fi
     log_success "Tests exitosos"
