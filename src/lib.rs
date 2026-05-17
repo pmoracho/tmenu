@@ -42,29 +42,9 @@ struct Args {
 
 rust_i18n::i18n!("locales");
 
-/// Función principal: configura el terminal, maneja errores y ejecuta la app.
-fn main() {
-    let idioma_compilacion = option_env!("RUST_I18N_DEFAULT_LOCALE").unwrap_or("en");
-    rust_i18n::set_locale(idioma_compilacion);
-
-    // registrar un hook de pánico:
-    let original_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |info| {
-        let _ = disable_raw_mode();
-        let _ = execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture);
-        original_hook(info);
-    }));
-
-    if let Err(err) = run() {
-        // Aquí es donde ocurre la magia: {} usa tu impl fmt::Display
-        eprintln!("\n❌ Error: {}", err);
-        std::process::exit(1);
-    }
-}
-
 /// Configura el terminal en modo raw, ejecuta el ciclo principal de eventos, y
 /// asegura restaurar el estado del terminal al salir, incluso si ocurre un error.
-fn run() -> Result<(), AppError> {
+pub fn run() -> Result<(), AppError> {
     let args = Args::parse();
 
     let mut app = App::from_toon(&args.menu_file, args.debug).map_err(|e| match e {

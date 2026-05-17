@@ -6,6 +6,16 @@ authors = ["Patricio Moracho\n<pmoracho@gmail.com>",]
 repository = "https://github.com/pmoracho/tmenu"
 description = "Un menu interactivo y configurable para terminales"
 
+[[bin]]
+name = "tmenu-en"
+path = "src/bin/tmenu-en.rs"
+required-features = ["lang_en"]
+
+[[bin]]
+name = "tmenu-es"
+path = "src/bin/tmenu-es.rs"
+required-features = ["lang_es"]
+
 [package.metadata.wix]
 upgrade-guid = "1636E04D-C2BA-4840-B4A5-17AC7A9F5B99"
 path-guid = "7A1C5B68-8360-47E4-BADE-18919DBBE73F"
@@ -27,6 +37,6 @@ inherits = "release"
 lto = "thin"
 
 [features]
-default = ["lang_es"]
+default = []
 lang_en = []
 lang_es = []

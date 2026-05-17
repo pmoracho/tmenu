@@ -123,9 +123,17 @@
                         <Component Id='binary0' Guid='*'>
                             <File
                                 Id='exe0'
-                                Name='tmenu.exe'
+                                Name='tmenu-en.exe'
                                 DiskId='1'
-                                Source='$(var.CargoTargetBinDir)\tmenu.exe'
+                                Source='$(var.CargoTargetBinDir)\tmenu-en.exe'
+                                KeyPath='yes'/>
+                        </Component>
+                        <Component Id='binary1' Guid='*'>
+                            <File
+                                Id='exe1'
+                                Name='tmenu-es.exe'
+                                DiskId='1'
+                                Source='$(var.CargoTargetBinDir)\tmenu-es.exe'
                                 KeyPath='yes'/>
                         </Component>
                     </Directory>
@@ -150,6 +158,7 @@
             <!--<ComponentRef Id='License'/>-->
 
             <ComponentRef Id='binary0'/>
+            <ComponentRef Id='binary1'/>
 
             <Feature
                 Id='Environment'
