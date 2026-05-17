@@ -24,6 +24,7 @@ impl Default for GlobalConfig {
 /// el titulo principal y la lista de items del menu raiz.
 pub fn parse_toon_file(path: &Path) -> Result<(GlobalConfig, String, Vec<MenuItem>), AppError> {
     let content = fs::read_to_string(path)?;
+    let cleaned_content = clean_invisible_chars(&content);
 
     let mut config = GlobalConfig::default();
     let mut main_title = String::from("Menu Principal");
@@ -33,7 +34,7 @@ pub fn parse_toon_file(path: &Path) -> Result<(GlobalConfig, String, Vec<MenuIte
 
     let mut config_base_indent: Option<usize> = None;
 
-    for line in content.lines() {
+    for line in cleaned_content.lines() {
         let normalized = line.replace('\t', "    ");
         if normalized.trim().is_empty() {
             continue;
@@ -243,6 +244,32 @@ pub fn extract_params(cmd: &str) -> Vec<CommandParam> {
     params
 }
 
+fn clean_invisible_chars(s: &str) -> String {
+    let original_len = s.len();
+    let result: String = s
+        .chars()
+        .filter(|c| {
+            !matches!(c,
+                '\u{FE0F}' |    // Emoji Variation Selector
+                '\u{200B}' |    // Zero Width Space
+                '\u{FEFF}' |    // Byte Order Mark
+                '\u{200C}'      // Zero Width Non-Joiner
+            )
+        })
+        .collect();
+    let cleaned_len = result.len();
+
+    // Log de debug si algo fue removido
+    if original_len != cleaned_len {
+        eprintln!(
+            "[parser] Caracteres invisibles removidos: {} → {} bytes",
+            original_len, cleaned_len
+        );
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -302,5 +329,65 @@ mod tests {
     #[test]
     fn test_execution_mode_from_str_default() {
         assert_eq!(ExecutionMode::from_str("unknown"), ExecutionMode::Inherit);
+    }
+    #[test]
+    fn test_clean_emoji_variation_selector() {
+        let dirty = "🛠\u{FE0F}";
+        let clean = clean_invisible_chars(dirty);
+        assert_eq!(clean, "🛠");
+    }
+
+    #[test]
+    fn test_clean_zero_width_space() {
+        let dirty = "test\u{200B}word";
+        let clean = clean_invisible_chars(dirty);
+        assert_eq!(clean, "testword");
+    }
+
+    #[test]
+    fn test_clean_byte_order_mark() {
+        let dirty = "\u{FEFF}test";
+        let clean = clean_invisible_chars(dirty);
+        assert_eq!(clean, "test");
+    }
+
+    #[test]
+    fn test_clean_zero_width_non_joiner() {
+        let dirty = "test\u{200C}word";
+        let clean = clean_invisible_chars(dirty);
+        assert_eq!(clean, "testword");
+    }
+
+    #[test]
+    fn test_clean_multiple_invisible_chars() {
+        let dirty = "\u{FEFF}test\u{200B}word\u{FE0F}";
+        let clean = clean_invisible_chars(dirty);
+        assert_eq!(clean, "testword");
+    }
+
+    #[test]
+    fn test_clean_preserves_accents() {
+        let text = "café";
+        let clean = clean_invisible_chars(text);
+        assert_eq!(clean, "café");  // ✅ Se mantiene el acento
+    }
+
+    #[test]
+    fn test_clean_preserves_zwj_emoji() {
+        let text = "👨\u{200D}💻";
+        let clean = clean_invisible_chars(text);
+        assert_eq!(clean, "👨\u{200D}💻");  // ✅ Emoji compuesto intacto
+    }
+
+    #[test]
+    fn test_clean_empty_string() {
+        assert_eq!(clean_invisible_chars(""), "");
+    }
+
+    #[test]
+    fn test_clean_normal_text() {
+        let text = "Hola mundo";
+        let clean = clean_invisible_chars(text);
+        assert_eq!(clean, "Hola mundo");  // ✅ Texto normal sin cambios
     }
 }

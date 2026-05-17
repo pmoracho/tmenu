@@ -12,6 +12,7 @@ use std::process::Command;
 use crate::model::{
     CommandParam, ConfirmationState, ExecutionMode, HistoryEntry, MenuAction, MenuItem,
 };
+
 use crate::parser::parse_toon_file;
 use crate::search::{filter_recursive, find_first_command};
 use crate::{error::AppError, history, parser};
@@ -21,7 +22,6 @@ pub struct App {
     pub history: Vec<HistoryEntry>,
     pub current_title: String,
     pub current_items: Vec<MenuItem>,
-    /// Ítems del menú raíz, guardados al inicio para que `go_home` sea exacto.
     pub root_title: String,
     pub root_items: Vec<MenuItem>,
     pub state: ListState,
@@ -31,17 +31,16 @@ pub struct App {
     pub show_help: bool,
     pub debug: bool,
     pub wizard: Option<WizardState>,
-    /// Modal de confirmación: Some(cmd) = usuario debe confirmar; None = no hay confirmación pendiente
     pub confirmation: Option<ConfirmationState>,
-    /// Modo de ejecución global (Clean o Inherit)
     pub execution_mode: ExecutionMode,
 }
 
+/// Implementación de métodos para `App`.
 impl App {
     /// Crea una instancia de `App` cargando el menú desde un archivo `.toon`.
     pub fn from_toon(path: &std::path::Path, debug: bool) -> Result<Self, AppError> {
-        let (config, main_title, root_items) = parse_toon_file(path)?;
 
+        let (config, main_title, root_items) = parse_toon_file(path)?;
         let mut state = ListState::default();
         state.select(Some(0));
 
@@ -116,8 +115,6 @@ impl App {
     }
 
     /// Vuelve directamente al menú raíz usando los ítems guardados al inicio.
-    /// Fix: el código original usaba `history.drain().next()` que descartaba
-    /// el estado real del root (guardaba el estado al entrar al primer submenú).
     pub fn go_home(&mut self) {
         if self.history.is_empty() {
             return;
@@ -346,6 +343,8 @@ impl App {
 
         Ok(())
     }
+
+    /// Construye la cadena de breadcrumb para el título, truncando si es muy larga.
     pub fn breadcrumb(&self) -> String {
         const MAX_WIDTH: usize = 40;
 
@@ -377,6 +376,7 @@ impl App {
         }
         current.chars().take(MAX_WIDTH).collect()
     }
+
     /// Finaliza el wizard: si requiere confirmación, muestra modal; sino, ejecuta directo.
     pub fn finish_wizard(
         &mut self,
@@ -435,6 +435,7 @@ pub struct WizardState {
     pub require_confirmation: bool,
 }
 
+/// Implementación de métodos para `WizardState`.
 impl WizardState {
     pub fn new(params: Vec<CommandParam>, cmd: String, require_confirmation: bool) -> Self {
         let len = params.len();

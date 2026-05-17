@@ -12,7 +12,6 @@ use crate::model::MenuAction;
 // ═══════════════════════════════════════════════════════════════
 // PALETA DE COLORES ELEGANTE Y COHERENTE
 // ═══════════════════════════════════════════════════════════════
-// Inspirada en interfaces modernas minimalistas con tonos sofisticados
 
 /// Color de bordes principal: azul grisáceo sutil
 const COLOR_BORDER_PRIMARY: Color = Color::Rgb(100, 130, 160);
@@ -102,6 +101,8 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     }
 }
 
+/// Renderiza el modal del wizard para comandos con parámetros, mostrando el campo actual,
+/// el comando original, y un resumen de los parámetros ya completados.
 fn render_wizard(f: &mut Frame, app: &App) {
     use ratatui::widgets::Clear;
 
@@ -195,6 +196,7 @@ fn render_wizard(f: &mut Frame, app: &App) {
     let cursor_y = inner[2].y + 1;
     f.set_cursor_position((cursor_x, cursor_y));
 }
+
 /// Renderiza la lista de items del menu.
 fn render_menu_list(
     f: &mut Frame,
@@ -293,6 +295,7 @@ fn render_search_bar(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(input_panel, area);
 }
 
+/// Renderiza un popup de vista previa del comando seleccionado, si es un comando ejecutable.
 fn render_preview_popup(
     f: &mut Frame,
     app: &App,

@@ -12,6 +12,7 @@ pub enum AppError {
     HistoryError(String),
 }
 
+/// Implementación de `Display` para `AppError` para mostrar mensajes amigables al usuario.
 impl fmt::Display for AppError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -33,6 +34,7 @@ impl fmt::Display for AppError {
     }
 }
 
+/// Implementación de `std::error::Error` para `AppError` para permitir encadenamiento de errores.
 impl std::error::Error for AppError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
@@ -42,6 +44,7 @@ impl std::error::Error for AppError {
     }
 }
 
+/// Implementación de conversión de `std::io::Error` a `AppError` para facilitar el manejo de errores.
 impl From<std::io::Error> for AppError {
     fn from(e: std::io::Error) -> Self {
         AppError::IoError(e)
