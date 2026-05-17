@@ -197,6 +197,7 @@ impl App {
         terminal: &mut Terminal<CrosstermBackend<Stdout>>,
         cmd: &str,
     ) -> Result<bool, AppError> {
+        // Validar seguridad ANTES de mostrar cualquier modal
         if !Self::is_safe_command(cmd) {
             return Err(AppError::ForbiddenCommand(cmd.to_string()));
         }
@@ -208,68 +209,10 @@ impl App {
         let should_execute = crate::run_confirmation_modal(terminal, self)?;
 
         if should_execute {
-            self.execute_command_internal(terminal, cmd)?;
+            self.execute_external_command(terminal, cmd)?;
         }
 
         Ok(false)
-    }
-
-    /// Ejecuta un comando externo SIN pedir confirmación.
-    /// Si `execution_mode` es `Clean`, ejecuta `clear` antes del comando.
-    /// (Usado internamente después de que el usuario confirma).
-    fn execute_command_internal(
-        &self,
-        terminal: &mut Terminal<CrosstermBackend<Stdout>>,
-        cmd: &str,
-    ) -> Result<(), AppError> {
-        if self.debug {
-            eprintln!("{} {:?}", t!("logs.debugging"), cmd);
-        }
-
-        // Restaurar terminal a modo normal
-        let _ = disable_raw_mode();
-        if let Err(e) = execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture) {
-            eprintln!("{} {}", t!("errors.terminal_restore"), e);
-        }
-
-        // Si el modo es Clean, limpiar pantalla antes de ejecutar
-        if self.execution_mode == crate::model::ExecutionMode::Clean {
-            let _ = std::process::Command::new("clear").spawn();
-        }
-
-        let parts: Vec<String> = shlex::split(cmd)
-            .unwrap_or_else(|| cmd.split_whitespace().map(str::to_string).collect());
-
-        if let Some((bin, args)) = parts.split_first() {
-            let mut command = Command::new(bin);
-            command.args(args);
-            match command.spawn() {
-                Ok(mut child) => {
-                    let _ = child.wait();
-                    // Registrar en historial solo si la ejecución fue exitosa
-                    if let Err(e) = history::log_command(cmd) {
-                        eprintln!("{} {}", t!("errors.history_save"), e);
-                    }
-                }
-                Err(e) => eprintln!("{} '{}': {}", t!("errors.execution_failed"), bin, e),
-            }
-        }
-
-        println!("\n{}", t!("prompts.press_enter"));
-        let _ = io::stdin().read_line(&mut String::new());
-
-        // Volver a modo TUI
-        if let Err(e) = enable_raw_mode() {
-            eprintln!("{} {}", t!("errors.raw_mode_enable"), e);
-        }
-        if let Err(e) = execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture) {
-            eprintln!("{} {}", t!("errors.alt_screen_restore"), e);
-        }
-        terminal
-            .clear()
-            .map_err(|e| AppError::TerminalError(e.to_string()))?;
-
-        Ok(())
     }
 
     /// Ejecuta un comando externo en el shell del sistema operativo.
@@ -284,7 +227,7 @@ impl App {
     ///   `split_whitespace`, que parte argumentos con espacios.
     /// - Los valores interpolados por el wizard se validan aquí también,
     ///   ya que `finish_wizard` llama a este método con el comando resuelto.
-     pub fn execute_external_command(
+    pub fn execute_external_command(
         &self,
         terminal: &mut Terminal<CrosstermBackend<Stdout>>,
         cmd: &str,
@@ -407,7 +350,14 @@ impl App {
         if cmd.split_whitespace().any(|part| part.contains("..")) {
             return false;
         }
-        // Allowlist de caracteres válidos
+
+        // Rechazar shell metacaracteres peligrosos (aunque no ejecutemos sh -c)
+        // - `;` puede concatenar comandos si pasa a exec sin cuidado
+        // - `$()` o backticks podrían expandirse
+        // - `|`, `&`, `>`, `<` son redirecciones
+        // Nota: `shlex::split` respeta quoting, así que "arg;with;semicolon" es seguro
+
+        // Allowlist de caracteres válidos (más restrictivo)
         cmd.chars().all(|c| {
             matches!(c,
                 'a'..='z' | 'A'..='Z' | '0'..='9'

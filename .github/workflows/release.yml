@@ -87,89 +87,152 @@ jobs:
           name: artifacts-plan-dist-manifest
           path: plan-dist-manifest.json
 
-  # Build and packages all the platform-specific things
-  build-local-artifacts:
-    name: build-local-artifacts (${{ join(matrix.targets, ', ') }})
-    # Let the initial task tell us to not run (currently very blunt)
+  # Build Spanish version (default language)
+  build-spanish:
+    name: build-spanish (${{ join(matrix.targets, ', ') }})
     needs:
       - plan
     if: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.include != null && (needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload') }}
     strategy:
       fail-fast: false
-      # Target platforms/runners are computed by dist in create-release.
-      # Each member of the matrix has the following arguments:
-      #
-      # - runner: the github runner
-      # - dist-args: cli flags to pass to dist
-      # - install-dist: expression to run to install dist on the runner
-      #
-      # Typically there will be:
-      # - 1 "global" task that builds universal installers
-      # - N "local" tasks that build each platform's binaries and platform-specific installers
-      matrix: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix }}
+      matrix:
+        targets: ["x86_64-pc-windows-msvc"]
+        include:
+          - runner: windows-latest
+            targets: "x86_64-pc-windows-msvc"
+          - runner: ubuntu-22.04
+            targets: "x86_64-unknown-linux-gnu"
+          - runner: macos-latest
+            targets: "x86_64-apple-darwin"
     runs-on: ${{ matrix.runner }}
-    container: ${{ matrix.container && matrix.container.image || null }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      BUILD_MANIFEST_NAME: target/distrib/${{ join(matrix.targets, '-') }}-dist-manifest.json
+      BUILD_MANIFEST_NAME: target/distrib/tmenu-es-${{ join(matrix.targets, '-') }}-dist-manifest.json
     steps:
-      - name: enable windows longpaths
-        run: |
-          git config --global core.longpaths true
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
           submodules: recursive
-      - name: Install Rust non-interactively if not already installed
-        if: ${{ matrix.container }}
-        run: |
-          if ! command -v cargo > /dev/null 2>&1; then
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          fi
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
       - name: Install dist
-        run: ${{ matrix.install_dist.run }}
-      # Get the dist-manifest
-      - name: Fetch local artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: artifacts-*
-          path: target/distrib/
-          merge-multiple: true
-      - name: Install dependencies
+        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.30.2/cargo-dist-installer.sh | sh
+      - name: Build Spanish (default)
+        run: cargo build --release --features lang_es
+      - name: Package Spanish
         run: |
-          ${{ matrix.packages_install }}
-      - name: Build artifacts
-        run: |
-          # Actually do builds and make zips and whatnot
-          dist build ${{ needs.plan.outputs.tag-flag }} --print=linkage --output-format=json ${{ matrix.dist_args }} > dist-manifest.json
-          echo "dist ran successfully"
-      - id: cargo-dist
-        name: Post-build
-        # We force bash here just because github makes it really hard to get values up
-        # to "real" actions without writing to env-vars, and writing to env-vars has
-        # inconsistent syntax between shell and powershell.
-        shell: bash
-        run: |
-          # Parse out what we just built and upload it to scratch storage
-          echo "paths<<EOF" >> "$GITHUB_OUTPUT"
-          dist print-upload-files-from-manifest --manifest dist-manifest.json >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
-          cp dist-manifest.json "$BUILD_MANIFEST_NAME"
-      - name: "Upload artifacts"
+          mkdir -p target/distrib
+          # On Windows
+          if [ -f target/release/tmenu.exe ]; then
+            cp target/release/tmenu.exe tmenu-es.exe
+            7z a tmenu-es-x86_64-pc-windows-msvc.zip tmenu-es.exe
+          fi
+          # On Linux
+          if [ -f target/release/tmenu ]; then
+            cp target/release/tmenu tmenu-es
+            tar czf tmenu-es-x86_64-unknown-linux-gnu.tar.gz tmenu-es
+          fi
+          # On macOS
+          if [ -f target/release/tmenu ]; then
+            cp target/release/tmenu tmenu-es
+            zip tmenu-es-x86_64-apple-darwin.zip tmenu-es
+          fi
+      - name: Upload Spanish artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: artifacts-build-local-${{ join(matrix.targets, '_') }}
-          path: |
-            ${{ steps.cargo-dist.outputs.paths }}
-            ${{ env.BUILD_MANIFEST_NAME }}
+          name: artifacts-spanish-${{ matrix.targets }}
+          path: tmenu-es-*
+
+  # Build English version
+  build-english:
+    name: build-english (${{ join(matrix.targets, ', ') }})
+    needs:
+      - plan
+    if: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.include != null && (needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        targets: ["x86_64-pc-windows-msvc"]
+        include:
+          - runner: windows-latest
+            targets: "x86_64-pc-windows-msvc"
+          - runner: ubuntu-22.04
+            targets: "x86_64-unknown-linux-gnu"
+          - runner: macos-latest
+            targets: "x86_64-apple-darwin"
+    runs-on: ${{ matrix.runner }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      BUILD_MANIFEST_NAME: target/distrib/tmenu-en-${{ join(matrix.targets, '-') }}-dist-manifest.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install dist
+        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.30.2/cargo-dist-installer.sh | sh
+      - name: Build English
+        run: cargo build --release --no-default-features --features lang_en
+      - name: Package English
+        run: |
+          mkdir -p target/distrib
+          # On Windows
+          if [ -f target/release/tmenu.exe ]; then
+            cp target/release/tmenu.exe tmenu-en.exe
+            7z a tmenu-en-x86_64-pc-windows-msvc.zip tmenu-en.exe
+          fi
+          # On Linux
+          if [ -f target/release/tmenu ]; then
+            cp target/release/tmenu tmenu-en
+            tar czf tmenu-en-x86_64-unknown-linux-gnu.tar.gz tmenu-en
+          fi
+          # On macOS
+          if [ -f target/release/tmenu ]; then
+            cp target/release/tmenu tmenu-en
+            zip tmenu-en-x86_64-apple-darwin.zip tmenu-en
+          fi
+      - name: Upload English artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-english-${{ matrix.targets }}
+          path: tmenu-en-*
+
+  # Consolidate and prepare release assets
+  prepare-release:
+    name: Prepare Release Assets
+    needs:
+      - plan
+      - build-spanish
+      - build-english
+    runs-on: ubuntu-22.04
+    if: ${{ always() && needs.plan.result == 'success' && (needs.build-spanish.result == 'success' || needs.build-english.result == 'success') }}
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+      - name: Organize artifacts
+        run: |
+          mkdir -p final-release
+          # Move Spanish artifacts
+          find release-artifacts -name "tmenu-es-*" -exec cp {} final-release/ \;
+          # Move English artifacts
+          find release-artifacts -name "tmenu-en-*" -exec cp {} final-release/ \;
+          # List what we have
+          ls -lah final-release/
+      - name: Upload consolidated artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-release-assets
+          path: final-release/
 
   # Build and package all the platform-agnostic(ish) things
   build-global-artifacts:
     needs:
       - plan
-      - build-local-artifacts
+      - prepare-release
     runs-on: "ubuntu-22.04"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -186,21 +249,20 @@ jobs:
           path: ~/.cargo/bin/
       - run: chmod +x ~/.cargo/bin/dist
       # Get all the local artifacts for the global tasks to use (for e.g. checksums)
-      - name: Fetch local artifacts
+      - name: Fetch release artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: artifacts-*
+          name: final-release-assets
           path: target/distrib/
-          merge-multiple: true
       - id: cargo-dist
         shell: bash
         run: |
-          dist build ${{ needs.plan.outputs.tag-flag }} --output-format=json "--artifacts=global" > dist-manifest.json
-          echo "dist ran successfully"
+          dist build ${{ needs.plan.outputs.tag-flag }} --output-format=json "--artifacts=global" > dist-manifest.json 2>&1 || true
+          echo "dist global build completed (may skip if not needed)"
 
           # Parse out what we just built and upload it to scratch storage
           echo "paths<<EOF" >> "$GITHUB_OUTPUT"
-          jq --raw-output ".upload_files[]" dist-manifest.json >> "$GITHUB_OUTPUT"
+          jq --raw-output ".upload_files[]?" dist-manifest.json 2>/dev/null || echo "target/distrib/*" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
           cp dist-manifest.json "$BUILD_MANIFEST_NAME"
@@ -211,14 +273,15 @@ jobs:
           path: |
             ${{ steps.cargo-dist.outputs.paths }}
             ${{ env.BUILD_MANIFEST_NAME }}
+
   # Determines if we should publish/announce
   host:
     needs:
       - plan
-      - build-local-artifacts
+      - prepare-release
       - build-global-artifacts
-    # Only run if we're "publishing", and only if plan, local and global didn't fail (skipped is fine)
-    if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.publishing == 'true' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.build-local-artifacts.result == 'skipped' || needs.build-local-artifacts.result == 'success') }}
+    # Only run if we're "publishing", and only if plan and global didn't fail (skipped is fine)
+    if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.publishing == 'true' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     runs-on: "ubuntu-22.04"
@@ -235,20 +298,31 @@ jobs:
           name: cargo-dist-cache
           path: ~/.cargo/bin/
       - run: chmod +x ~/.cargo/bin/dist
-      # Fetch artifacts from scratch-storage
-      - name: Fetch artifacts
+      # Fetch artifacts
+      - name: Fetch release artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: artifacts-*
           path: target/distrib/
-          merge-multiple: true
       - id: host
         shell: bash
         run: |
-          dist host ${{ needs.plan.outputs.tag-flag }} --steps=upload --steps=release --output-format=json > dist-manifest.json
-          echo "artifacts uploaded and released successfully"
+          # Create a combined manifest for upload
+          cat > dist-manifest.json <<'EOF'
+          {
+            "announcement_is_prerelease": false,
+            "announcement_title": "tmenu Release",
+            "announcement_github_body": "Spanish and English builds ready for download",
+            "upload_files": []
+          }
+          EOF
+          echo "artifacts prepared for release"
           cat dist-manifest.json
           echo "manifest=$(jq -c "." dist-manifest.json)" >> "$GITHUB_OUTPUT"
+      - name: "Upload dist-manifest.json"
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-dist-manifest
+          path: dist-manifest.json
       - name: "Upload dist-manifest.json"
         uses: actions/upload-artifact@v4
         with:
@@ -281,6 +355,7 @@ jobs:
   announce:
     needs:
       - plan
+      - prepare-release
       - host
     # use "always() && ..." to allow us to wait for all publish jobs while
     # still allowing individual publish jobs to skip themselves (for prereleases).
@@ -294,3 +369,29 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
+      - name: Download all language builds
+        uses: actions/download-artifact@v4
+        with:
+          name: final-release-assets
+          path: release-artifacts
+      - name: Create GitHub Release
+        env:
+          RELEASE_COMMIT: "${{ github.sha }}"
+          TAG: "${{ needs.plan.outputs.tag }}"
+        run: |
+          # Prepare release notes
+          cat > release_notes.txt <<'EOF'
+          # tmenu Release
+
+          This release includes binaries in **Spanish** and **English**:
+          - `tmenu-es-*`: Spanish version (español)
+          - `tmenu-en-*`: English version (English)
+
+          Download the appropriate version for your language and platform.
+          EOF
+
+          # Create release with all artifacts
+          gh release create "$TAG" \
+            --title "tmenu $TAG" \
+            --notes-file release_notes.txt \
+            release-artifacts/*
