@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -9,45 +11,27 @@ use ratatui::{
 use crate::app::App;
 use crate::model::MenuAction;
 
+// Importamos la macro de traducción de rust-i18n
+use rust_i18n::t;
+
 // ═══════════════════════════════════════════════════════════════
 // PALETA DE COLORES ELEGANTE Y COHERENTE
 // ═══════════════════════════════════════════════════════════════
 
-/// Color de bordes principal: azul grisáceo sutil
 const COLOR_BORDER_PRIMARY: Color = Color::Rgb(100, 130, 160);
-
-/// Color de bordes secundario: más oscuro, para énfasis
 const COLOR_BORDER_ACCENT: Color = Color::Rgb(80, 110, 150);
-
-/// Color de fondo para selección: azul profundo muy suave
 const COLOR_HIGHLIGHT_BG: Color = Color::Rgb(40, 60, 100);
-
-/// Color de texto resaltado: blanco con ligerísimo azul
 const COLOR_HIGHLIGHT_FG: Color = Color::Rgb(220, 230, 245);
-
-/// Color para búsqueda exitosa: verde agua sutil
 const COLOR_SEARCH_SUCCESS: Color = Color::Rgb(100, 170, 140);
-
-/// Color para búsqueda fallida: rojo suave
 const COLOR_SEARCH_FAIL: Color = Color::Rgb(200, 100, 110);
-
-/// Color para comandos/ejecutables: cyan sutil
 const COLOR_COMMAND: Color = Color::Rgb(120, 180, 200);
-
-/// Color para texto secundario/gris: neutro elegante
 const COLOR_SECONDARY: Color = Color::Rgb(140, 150, 170);
-
-///Color para el dialogo de confirmación: naranja suave
 const COLOR_CONFIRMATION: Color = Color::Rgb(209, 85, 85);
-
-// /// Color para errores y alertas: rojo moderno
-// const COLOR_ERROR: Color = Color::Rgb(210, 110, 120);
 
 /// Renderiza la interfaz completa en cada ciclo de dibujado.
 pub fn ui(f: &mut Frame, app: &mut App) {
     let items_to_render = app.filtered_items();
 
-    // Ajustar seleccion si esta fuera de rango (puede pasar al filtrar)
     if !items_to_render.is_empty()
         && app
             .state
@@ -57,13 +41,9 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         app.state.select(Some(0));
     }
 
-    // Clonar titulo para liberar el borrow inmutable antes de pasar app como mutable.
     let title = app.breadcrumb();
-
-    // Calcular dimensiones a partir de items_to_render (lo que realmente se dibuja),
-    // no de current_items. Usar chars().count() para ancho visual correcto con Unicode.
     let title_w = title.chars().count();
-    // Dimensiones basadas en current_items para que el box no salte al filtrar
+
     let max_label_w = app
         .current_items
         .iter()
@@ -73,7 +53,6 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     let max_w = max_label_w.max(title_w);
 
     let box_width = (max_w + 14).max(24) as u16;
-    // Altura fija al máximo del nivel actual (no al filtrado)
     let box_height = (app.current_items.len() + 7).max(8) as u16;
 
     let area = centered_rect(box_width, box_height, f.area());
@@ -81,8 +60,8 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(3),    // Lista (crece)
-            Constraint::Length(3), // Barra de busqueda (fija)
+            Constraint::Min(3),
+            Constraint::Length(3),
         ])
         .split(area);
 
@@ -101,8 +80,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     }
 }
 
-/// Renderiza el modal del wizard para comandos con parámetros, mostrando el campo actual,
-/// el comando original, y un resumen de los parámetros ya completados.
+/// Renderiza el modal del wizard para comandos con parámetros.
 fn render_wizard(f: &mut Frame, app: &App) {
     use ratatui::widgets::Clear;
 
@@ -110,15 +88,14 @@ fn render_wizard(f: &mut Frame, app: &App) {
     let param = wizard.current_param();
 
     let total = wizard.params.len();
-    let current = wizard.current + 1; // 1-based para el usuario
+    let current = wizard.current + 1;
 
-    // Título con progreso: "Branch name (1/3)"
+    // Título dinámico traducido
     let title = format!(" {} ({}/{}) ", param.label, current, total);
-
     let input_line = wizard.input.as_str();
 
     let popup_w: u16 = 54;
-    let popup_h: u16 = 9; // título + cmd preview + separador + input + hints + bordes
+    let popup_h: u16 = 9;
     let area = centered_rect(popup_w, popup_h, f.area());
 
     f.render_widget(Clear, area);
@@ -126,30 +103,27 @@ fn render_wizard(f: &mut Frame, app: &App) {
     let inner = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(2), // línea de contexto del comando
-            Constraint::Length(1), // label del placeholder  ← NUEVO
-            Constraint::Length(3), // campo de input
-            Constraint::Length(1), // hints
+            Constraint::Length(2),
+            Constraint::Length(1),
+            Constraint::Length(3),
+            Constraint::Length(1),
         ])
         .margin(1)
         .split(area);
 
-    // Bloque contenedor
     let block = Block::default()
         .title(title)
         .title_alignment(Alignment::Center)
-        .title_bottom(Line::from(" [Enter] Confirmar  [Esc] Cancelar ").centered())
+        .title_bottom(Line::from(t!("ui.wizard.bottom_hints")).centered())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(COLOR_BORDER_ACCENT));
     f.render_widget(block, area);
 
-    // Ancho disponible: ancho del popup menos márgenes y borde (popup_w - 4)
     let available_w = (popup_w as usize).saturating_sub(3);
     let cmd_str = format!("cmd: {}", wizard.original_cmd);
 
     let cmd_display = if cmd_str.chars().count() > available_w {
-        // Truncar dejando espacio para "..."
         let truncated: String = cmd_str
             .chars()
             .take(available_w.saturating_sub(3))
@@ -162,7 +136,6 @@ fn render_wizard(f: &mut Frame, app: &App) {
     let cmd_widget = Paragraph::new(cmd_display).style(Style::default().fg(COLOR_SECONDARY));
     f.render_widget(cmd_widget, inner[0]);
 
-    // Label del campo actual: "Ingrese un nombre:"
     let summary: String = wizard.params[..wizard.current]
         .iter()
         .zip(wizard.values[..wizard.current].iter())
@@ -180,7 +153,6 @@ fn render_wizard(f: &mut Frame, app: &App) {
     );
     f.render_widget(label_widget, inner[1]);
 
-    // Campo de input
     let input_widget = Paragraph::new(input_line)
         .block(
             Block::default()
@@ -191,7 +163,6 @@ fn render_wizard(f: &mut Frame, app: &App) {
         .style(Style::default().fg(COLOR_COMMAND));
     f.render_widget(input_widget, inner[2]);
 
-    // Cursor dentro del campo de input
     let cursor_x = inner[2].x + wizard.input.chars().count() as u16 + 1;
     let cursor_y = inner[2].y + 1;
     f.set_cursor_position((cursor_x, cursor_y));
@@ -210,17 +181,18 @@ fn render_menu_list(
         .map(|item| {
             let symbol = match item.action {
                 MenuAction::OpenSubmenu(_) => " \u{25b6}",
-                MenuAction::Quit => " \u{2717}", // ✗ símbolo de salida
+                MenuAction::Quit => " \u{2717}",
                 _ => "",
             };
             ListItem::new(format!(" {}{}", item.label, symbol))
         })
         .collect();
 
+    // El hint inferior cambia según si podemos volver atrás en el historial
     let depth_hint = if app.history.is_empty() {
-        String::from(" [Ctrl+q] Salir ")
+        t!("ui.menu.hint_root")
     } else {
-        String::from(" [<-] Volver [Ctrl+q] Salir ")
+        t!("ui.menu.hint_submenu")
     };
 
     let list = List::new(list_items)
@@ -240,38 +212,37 @@ fn render_menu_list(
                 .fg(COLOR_HIGHLIGHT_FG)
                 .add_modifier(Modifier::BOLD),
         )
-        .highlight_symbol(" \u{27a4} "); // flecha
+        .highlight_symbol(" \u{27a4} ");
 
     f.render_stateful_widget(list, area, &mut app.state);
 }
 
-/// Renderiza la barra de busqueda (solo en modo busqueda).
+/// Renderiza la barra de busqueda.
 fn render_search_bar(f: &mut Frame, app: &App, area: Rect) {
     if !app.search_mode {
         return;
     }
 
-    // Contar resultados reales (sin el fallback)
     let result_count =
         crate::search::filter_recursive(&app.current_items, &app.search_text, 0).len();
 
     let (title, border_color, subtitle) = if result_count > 0 && !app.search_text.is_empty() {
         (
-            format!(" 🔍 Búsqueda: {} resultados ", result_count),
+            t!("ui.search.results", count = result_count),
             COLOR_SEARCH_SUCCESS,
-            " [Tab] Cerrar  [Esc] Limpiar ",
+            t!("ui.search.hints_results"),
         )
     } else if app.search_text.is_empty() {
         (
-            String::from(" 🔍 Búsqueda "),
+            t!("ui.search.title"),
             COLOR_COMMAND,
-            " [Tab] Cerrar ",
+            t!("ui.search.hints_empty"),
         )
     } else {
         (
-            String::from(" 🔍 Sin resultados "),
+            t!("ui.search.no_results"),
             COLOR_SEARCH_FAIL,
-            " [Esc] Limpiar  [Tab] Cerrar ",
+            t!("ui.search.hints_no_results"),
         )
     };
 
@@ -295,7 +266,7 @@ fn render_search_bar(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(input_panel, area);
 }
 
-/// Renderiza un popup de vista previa del comando seleccionado, si es un comando ejecutable.
+/// Renderiza un popup de vista previa del comando seleccionado.
 fn render_preview_popup(
     f: &mut Frame,
     app: &App,
@@ -308,7 +279,6 @@ fn render_preview_popup(
         return;
     }
 
-    // Solo mostrar preview si el item seleccionado es un comando ejecutable
     let is_executable_command = app
         .state
         .selected()
@@ -328,36 +298,31 @@ fn render_preview_popup(
             MenuAction::Execute(cmd) => Some(format!("$ {}", cmd)),
             _ => None,
         })
-        .unwrap_or_else(|| String::from("(sin selección)"));
+        .unwrap_or_else(|| t!("ui.preview.no_selection").to_string());
 
     let screen = f.area();
     let popup_w = (cmd_text.chars().count() as u16 + 6)
         .max(24)
         .min(screen.width.saturating_sub(4));
-    let popup_h: u16 = 3; // borde top + 1 línea de texto + borde bottom
+    let popup_h: u16 = 3;
 
-    // Fila Y del ítem seleccionado en coordenadas de terminal:
-    //   +1 borde superior, +1 padding top, +1 margen interno del bloque
     let index = app.state.selected().unwrap_or(0) as u16;
     let item_y = menu_area.y + 1 + 1 + 1 + index;
 
-    // Intentar colocar debajo; si no entra, colocar encima
     let popup_y = if item_y + 1 + popup_h <= screen.height {
-        item_y + 0
+        item_y
     } else {
         item_y.saturating_sub(popup_h)
     };
 
-    // Alinear horizontalmente con el menú, sin salirse de pantalla
     let popup_x = menu_area.x.min(screen.width.saturating_sub(popup_w)) + 5;
-
     let popup_area = Rect::new(popup_x, popup_y, popup_w, popup_h);
 
     f.render_widget(Clear, popup_area);
     let popup = Paragraph::new(cmd_text)
         .block(
             Block::default()
-                .title(" Comando a ejecutar ")
+                .title(t!("ui.preview.title"))
                 .title_alignment(Alignment::Center)
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
@@ -376,16 +341,17 @@ fn render_help_modal(f: &mut Frame) {
         widgets::{Cell, Clear, Row, Table},
     };
 
-    let shortcuts: &[(&str, &str)] = &[
-        ("↑ / ↓", "Navegar ítems (↑↓ funciona en búsqueda)"),
-        ("Enter / →", "Seleccionar / entrar al submenú"),
-        ("Esc / ←", "Volver al menú anterior / limpiar búsqueda"),
-        ("Inicio", "Ir al menú raíz"),
-        ("Tab", "Activar / cerrar búsqueda"),
-        ("Buscar", "Escribe para filtrar en vivo"),
-        ("Ctrl+Q", "Salir de la aplicación"),
-        ("F2", "Mostrar / ocultar vista previa"),
-        ("F1", "Mostrar / cerrar esta ayuda"),
+    // Estructuramos las filas llamando a t! para la descripción de cada atajo
+    let shortcuts: &[(&str, Cow<'_, str>)] = &[
+        ("↑ / ↓", t!("ui.help.keys.navigate")),
+        ("Enter / →", t!("ui.help.keys.select")),
+        ("Esc / ←", t!("ui.help.keys.back")),
+        ("Inicio", t!("ui.help.keys.root")),
+        ("Tab", t!("ui.help.keys.search")),
+        ("Buscar", t!("ui.help.keys.filter")),
+        ("Ctrl+Q", t!("ui.help.keys.quit")),
+        ("F2", t!("ui.help.keys.preview")),
+        ("F1", t!("ui.help.keys.help")),
     ];
 
     let rows: Vec<Row> = shortcuts
@@ -406,9 +372,9 @@ fn render_help_modal(f: &mut Frame) {
     let table = Table::new(rows, [Constraint::Length(18), Constraint::Min(50)])
         .block(
             Block::default()
-                .title(" Ayuda — Atajos de teclado ")
+                .title(t!("ui.help.title"))
                 .title_alignment(Alignment::Center)
-                .title_bottom(Line::from(" [Esc] [F1] Cerrar ").right_aligned())
+                .title_bottom(Line::from(t!("ui.help.bottom_hints")).right_aligned())
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(COLOR_BORDER_PRIMARY)),
@@ -416,7 +382,7 @@ fn render_help_modal(f: &mut Frame) {
         .column_spacing(1);
 
     let popup_w: u16 = 60;
-    let popup_h: u16 = shortcuts.len() as u16 + 2; // filas + bordes + padding
+    let popup_h: u16 = shortcuts.len() as u16 + 2;
     let area = centered_rect(popup_w, popup_h, f.area());
 
     f.render_widget(Clear, area);
@@ -432,7 +398,6 @@ fn render_confirmation_modal(f: &mut Frame, app: &App) {
         return;
     };
 
-    // Truncar comando muy largo
     let cmd_text = &confirmation.cmd;
     let max_cmd_width = 50;
     let cmd_display = if cmd_text.chars().count() > max_cmd_width {
@@ -446,7 +411,7 @@ fn render_confirmation_modal(f: &mut Frame, app: &App) {
     };
 
     let popup_w: u16 = 64;
-    let popup_h: u16 = 8; // título + cmd + separador + opciones + bordes + padding
+    let popup_h: u16 = 8;
     let area = centered_rect(popup_w, popup_h, f.area());
 
     f.render_widget(Clear, area);
@@ -454,28 +419,25 @@ fn render_confirmation_modal(f: &mut Frame, app: &App) {
     let inner = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(2), // línea del comando
-            Constraint::Length(1), // separador
-            Constraint::Length(3), // opciones Sí/No
+            Constraint::Length(2),
+            Constraint::Length(1),
+            Constraint::Length(3),
         ])
         .margin(1)
         .split(area);
 
-    // Bloque contenedor
     let block = Block::default()
-        .title(" ¿Ejecutar comando? ")
+        .title(t!("ui.confirm.title"))
         .title_alignment(Alignment::Center)
-        .title_bottom(Line::from(" [Enter] Confirmar  [Esc] Cancelar ").centered())
+        .title_bottom(Line::from(t!("ui.confirm.bottom_hints")).centered())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(COLOR_CONFIRMATION));
     f.render_widget(block, area);
 
-    // Mostrar el comando
     let cmd_widget = Paragraph::new(cmd_display).style(Style::default().fg(COLOR_COMMAND));
     f.render_widget(cmd_widget, inner[0]);
 
-    // Opciones: "[ Sí ]  [ No ]" con la selección destacada
     let si_style = if confirmation.selected == 0 {
         Style::default()
             .bg(COLOR_HIGHLIGHT_BG)
@@ -495,17 +457,15 @@ fn render_confirmation_modal(f: &mut Frame, app: &App) {
     };
 
     let options = vec![
-        Span::styled("  [ Sí ]  ", si_style),
+        Span::styled(t!("ui.confirm.yes"), si_style),
         Span::raw("     "),
-        Span::styled("  [ No ]  ", no_style),
+        Span::styled(t!("ui.confirm.no"), no_style),
     ];
 
     let options_widget = Paragraph::new(Line::from(options)).alignment(Alignment::Center);
     f.render_widget(options_widget, inner[2]);
 }
 
-/// Calcula un Rect centrado dentro de `r` con el tamano indicado,
-/// sin exceder los limites del contenedor.
 fn centered_rect(width: u16, height: u16, r: Rect) -> Rect {
     let w = width.min(r.width);
     let h = height.min(r.height);

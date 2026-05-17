@@ -16,11 +16,17 @@ eula = false
 ratatui = "0.30.0"
 crossterm = "0.29.0"
 clap = { version = "4.6.1", features = ["derive"] }
-shlex = "1"
+shlex = "2.0.1"
 chrono = "0.4"
 dirs = "6.0.0"
+rust-i18n = "4.0.0"
 
 # The profile that 'dist' will build with
 [profile.dist]
 inherits = "release"
 lto = "thin"
+
+[features]
+default = ["lang_es"]
+lang_en = []
+lang_es = []

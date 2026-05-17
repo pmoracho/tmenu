@@ -1,0 +1,64 @@
+errors:
+  menu_file_not_found: "Menu file not found: %{path}"
+  io_error: "I/O Error: %{error}"
+  terminal_error: "Terminal error: %{msg}"
+  forbidden_command: "The command contains forbidden characters: '%{command}'"
+  event_error: "Terminal event error: %{msg}"
+  history_error: "Error saving history: %{msg}"
+
+ui:
+  wizard:
+    bottom_hints: " [Enter] Confirm  [Esc] Cancel "
+  menu:
+    hint_root: " [Ctrl+q] Quit "
+    hint_submenu: " [<-] Back [Ctrl+q] Quit "
+  search:
+    title: " 🔍 Search "
+    results: " 🔍 Search: %{count} results "
+    no_results: " 🔍 No results "
+    hints_empty: " [Tab] Close "
+    hints_results: " [Tab] Close [Esc] Clear "
+    hints_no_results: " [Esc] Clear [Tab] Close "
+  preview:
+    title: " Command to execute "
+    no_selection: "(no selection)"
+  help:
+    title: " Help — Keyboard Shortcuts "
+    bottom_hints: " [Esc] [F1] Close "
+    keys:
+      navigate: "Navigate items (↑↓ works in search mode)"
+      select: "Select / enter submenu"
+      back: "Go back to previous menu / clear search"
+      root: "Go to root menu"
+      search: "Toggle search mode"
+      filter: "Type to filter live"
+      quit: "Exit the application"
+      preview: "Toggle command preview"
+      help: "Toggle this help modal"
+  confirm:
+    title: " Execute command? "
+    bottom_hints: " [Enter] Confirm [Esc] Cancel "
+    yes: "  [ Yes ]  "
+    no: "  [ No ]  "
+
+history:
+  errors:
+    home_not_found: "Could not determine the home directory"
+    invalid_path: "Invalid history path"
+    create_dir_failed: "Could not create directory: %{error}"
+    open_failed: "Could not open history: %{error}"
+    write_failed: "Could not write history: %{error}"
+
+app:
+  logs:
+    debugging: "[debug] executing:"
+
+  errors:
+    terminal_restore: "[warn] could not restore terminal:"
+    history_save: "[warn] could not save to history:"
+    execution_failed: "[error] could not execute"
+    raw_mode_enable: "[warn] could not enable raw mode:"
+    alt_screen_restore: "[warn] could not restore alternate screen:"
+
+  prompts:
+    press_enter: "Press Enter to return to the menu..."

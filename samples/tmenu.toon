@@ -5,7 +5,7 @@
 config:
     execution_mode: clean
 
-"Rust Project":
+"Rust Project": 
   Información:
     "Versión de cargo": cargo --version
     "Versión de rust": rustc --version

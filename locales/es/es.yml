@@ -1,0 +1,64 @@
+errors:
+  menu_file_not_found: "El archivo de menú no fue encontrado: %{path}"
+  io_error: "Error de I/O: %{error}"
+  terminal_error: "Error de terminal: %{msg}"
+  forbidden_command: "El comando contiene caracteres no permitidos: '%{command}'"
+  event_error: "Error de evento de terminal: %{msg}"
+  history_error: "Error al guardar historial: %{msg}"
+
+ui:
+  wizard:
+    bottom_hints: " [Enter] Confirmar [Esc] Cancelar "
+  menu:
+    hint_root: " [Ctrl+q] Salir "
+    hint_submenu: " [<-] Volver [Ctrl+q] Salir "
+  search:
+    title: " 🔍 Búsqueda "
+    results: " 🔍 Búsqueda: %{count} resultados "
+    no_results: " 🔍 Sin resultados "
+    hints_empty: " [Tab] Cerrar "
+    hints_results: " [Tab] Cerrar [Esc] Limpiar "
+    hints_no_results: " [Esc] Limpiar [Tab] Cerrar "
+  preview:
+    title: " Comando a ejecutar "
+    no_selection: "(sin selección)"
+  help:
+    title: " Ayuda — Atajos de teclado "
+    bottom_hints: " [Esc] [F1] Cerrar "
+    keys:
+      navigate: "Navegar ítems (↑↓ funciona en el modo búsqueda)"
+      select: "Seleccionar / entrar al submenú"
+      back: "Volver al menú anterior / limpiar la búsqueda"
+      root: "Ir al menú raíz"
+      search: "Activar / cerrar búsqueda"
+      filter: "Escribe para filtrar en vivo"
+      quit: "Salir de la aplicación"
+      preview: "Mostrar / ocultar vista previa"
+      help: "Mostrar / cerrar esta ayuda"
+  confirm:
+    title: " ¿Ejecutar comando? "
+    bottom_hints: " [Enter] Confirmar  [Esc] Cancelar "
+    yes: "  [ Sí ]  "
+    no: "  [ No ]  "
+
+history:
+  errors:
+    home_not_found: "No se pudo determinar el directorio home"
+    invalid_path: "Ruta de historial inválida"
+    create_dir_failed: "No se pudo crear el directorio: %{error}"
+    open_failed: "No se pudo abrir el historial: %{error}"
+    write_failed: "No se pudo escribir el historial: %{error}"
+
+app:
+  logs:
+    debugging: "[debug] ejecutando:"
+
+  errors:
+    terminal_restore: "[warn] no se pudo restaurar la terminal:"
+    history_save: "[warn] no se pudo guardar en historial:"
+    execution_failed: "[error] no se pudo ejecutar"
+    raw_mode_enable: "[warn] no se pudo activar raw mode:"
+    alt_screen_restore: "[warn] no se pudo restaurar pantalla alternativa:"
+
+  prompts:
+    press_enter: "Presioná Enter para volver al menú..."

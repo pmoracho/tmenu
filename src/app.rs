@@ -1,5 +1,5 @@
 use ratatui::{Terminal, backend::CrosstermBackend, widgets::ListState};
-
+use rust_i18n::t;
 use crossterm::{
     event::DisableMouseCapture,
     event::EnableMouseCapture,
@@ -16,6 +16,7 @@ use crate::model::{
 use crate::parser::parse_toon_file;
 use crate::search::{filter_recursive, find_first_command};
 use crate::{error::AppError, history, parser};
+// Asumiendo que tu macro t! se expone o importa desde aquí
 
 /// Estado principal de la aplicación TUI.
 pub struct App {
@@ -222,13 +223,13 @@ impl App {
         cmd: &str,
     ) -> Result<(), AppError> {
         if self.debug {
-            eprintln!("[debug] ejecutando: {:?}", cmd);
+            eprintln!("{} {:?}", t!("logs.debugging"), cmd);
         }
 
         // Restaurar terminal a modo normal
         let _ = disable_raw_mode();
         if let Err(e) = execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture) {
-            eprintln!("[warn] no se pudo restaurar la terminal: {}", e);
+            eprintln!("{} {}", t!("errors.terminal_restore"), e);
         }
 
         // Si el modo es Clean, limpiar pantalla antes de ejecutar
@@ -247,22 +248,22 @@ impl App {
                     let _ = child.wait();
                     // Registrar en historial solo si la ejecución fue exitosa
                     if let Err(e) = history::log_command(cmd) {
-                        eprintln!("[warn] no se pudo guardar en historial: {}", e);
+                        eprintln!("{} {}", t!("errors.history_save"), e);
                     }
                 }
-                Err(e) => eprintln!("[error] no se pudo ejecutar '{}': {}", bin, e),
+                Err(e) => eprintln!("{} '{}': {}", t!("errors.execution_failed"), bin, e),
             }
         }
 
-        println!("\nPresioná Enter para volver al menú...");
+        println!("\n{}", t!("prompts.press_enter"));
         let _ = io::stdin().read_line(&mut String::new());
 
         // Volver a modo TUI
         if let Err(e) = enable_raw_mode() {
-            eprintln!("[warn] no se pudo activar raw mode: {}", e);
+            eprintln!("{} {}", t!("errors.raw_mode_enable"), e);
         }
         if let Err(e) = execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture) {
-            eprintln!("[warn] no se pudo restaurar pantalla alternativa: {}", e);
+            eprintln!("{} {}", t!("errors.alt_screen_restore"), e);
         }
         terminal
             .clear()
@@ -283,7 +284,7 @@ impl App {
     ///   `split_whitespace`, que parte argumentos con espacios.
     /// - Los valores interpolados por el wizard se validan aquí también,
     ///   ya que `finish_wizard` llama a este método con el comando resuelto.
-    pub fn execute_external_command(
+     pub fn execute_external_command(
         &self,
         terminal: &mut Terminal<CrosstermBackend<Stdout>>,
         cmd: &str,
@@ -293,13 +294,13 @@ impl App {
         }
 
         if self.debug {
-            eprintln!("[debug] ejecutando: {:?}", cmd);
+            eprintln!("{} {:?}", t!("logs.debugging"), cmd);
         }
 
         // Restaurar terminal a modo normal
         let _ = disable_raw_mode();
         if let Err(e) = execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture) {
-            eprintln!("[warn] no se pudo restaurar la terminal: {}", e);
+            eprintln!("{} {}", t!("errors.terminal_restore"), e);
         }
 
         // Si el modo es Clean, limpiar pantalla antes de ejecutar
@@ -308,7 +309,6 @@ impl App {
         }
 
         // Parsear respetando quoting ("arg con espacios" se trata como un solo arg).
-        // Fallback a split_whitespace si shlex falla (comillas desbalanceadas, etc).
         let parts: Vec<String> = shlex::split(cmd)
             .unwrap_or_else(|| cmd.split_whitespace().map(str::to_string).collect());
 
@@ -320,22 +320,22 @@ impl App {
                     let _ = child.wait();
                     // Registrar en historial solo si la ejecución fue exitosa
                     if let Err(e) = history::log_command(cmd) {
-                        eprintln!("[warn] no se pudo guardar en historial: {}", e);
+                        eprintln!("{} {}", t!("errors.history_save"), e);
                     }
                 }
-                Err(e) => eprintln!("[error] no se pudo ejecutar '{}': {}", bin, e),
+                Err(e) => eprintln!("{} '{}': {}", t!("errors.execution_failed"), bin, e),
             }
         }
 
-        println!("\nPresioná Enter para volver al menú...");
+        println!("\n{}", t!("prompts.press_enter"));
         let _ = io::stdin().read_line(&mut String::new());
 
         // Volver a modo TUI
         if let Err(e) = enable_raw_mode() {
-            eprintln!("[warn] no se pudo activar raw mode: {}", e);
+            eprintln!("{} {}", t!("errors.raw_mode_enable"), e);
         }
         if let Err(e) = execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture) {
-            eprintln!("[warn] no se pudo restaurar pantalla alternativa: {}", e);
+            eprintln!("{} {}", t!("errors.alt_screen_restore"), e);
         }
         terminal
             .clear()
@@ -407,7 +407,7 @@ impl App {
         if cmd.split_whitespace().any(|part| part.contains("..")) {
             return false;
         }
-        // Allowlist de caracteres válidos (extendida respecto al original)
+        // Allowlist de caracteres válidos
         cmd.chars().all(|c| {
             matches!(c,
                 'a'..='z' | 'A'..='Z' | '0'..='9'
@@ -421,17 +421,11 @@ impl App {
 
 /// Estado del wizard de interpolación de parámetros.
 pub struct WizardState {
-    /// Parámetros a completar, en orden.
     pub params: Vec<CommandParam>,
-    /// Índice del parámetro actual.
     pub current: usize,
-    /// Valores ingresados hasta ahora (mismo orden que `params`).
     pub values: Vec<String>,
-    /// Texto que el usuario está escribiendo ahora mismo.
     pub input: String,
-    /// Comando original con placeholders sin reemplazar.
     pub original_cmd: String,
-    /// Si el ítem requiere confirmación después del wizard.
     pub require_confirmation: bool,
 }
 
@@ -449,28 +443,24 @@ impl WizardState {
         }
     }
 
-    /// Parámetro que se está pidiendo ahora.
     pub fn current_param(&self) -> &CommandParam {
         &self.params[self.current]
     }
 
-    /// Confirma el campo actual y avanza. Retorna `true` si era el último.
     pub fn confirm_current(&mut self) -> bool {
         self.values[self.current] = self.input.clone();
         self.input.clear();
         if self.current + 1 >= self.params.len() {
-            true // wizard completo
+            true
         } else {
             self.current += 1;
             false
         }
     }
 
-    /// Construye el comando final reemplazando todos los placeholders.
     pub fn resolve(&self) -> String {
         let mut cmd = self.original_cmd.clone();
         for (param, value) in self.params.iter().zip(self.values.iter()) {
-            // replace() reemplaza TODAS las ocurrencias del placeholder
             cmd = cmd.replace(&param.placeholder, value);
         }
         cmd

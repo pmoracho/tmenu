@@ -1,4 +1,7 @@
 /// Lector de menus interactivos TUI en Rust utilizando Ratatui y Clap.
+/// El programa carga un menú desde un archivo `.toon`, muestra una interfaz de texto
+/// para navegar y ejecutar comandos, con soporte para búsqueda fuzzy, historial,
+/// y un sistema de wizards para comandos con parámetros.
 mod app;
 mod error;
 mod history;
@@ -37,7 +40,13 @@ struct Args {
     debug: bool,
 }
 
+rust_i18n::i18n!("locales");
+
+/// Función principal: configura el terminal, maneja errores y ejecuta la app.
 fn main() {
+    let idioma_compilacion = option_env!("RUST_I18N_DEFAULT_LOCALE").unwrap_or("en");
+    rust_i18n::set_locale(idioma_compilacion);
+
     // registrar un hook de pánico:
     let original_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -53,6 +62,8 @@ fn main() {
     }
 }
 
+/// Configura el terminal en modo raw, ejecuta el ciclo principal de eventos, y
+/// asegura restaurar el estado del terminal al salir, incluso si ocurre un error.
 fn run() -> Result<(), AppError> {
     let args = Args::parse();
 

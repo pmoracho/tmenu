@@ -4,11 +4,12 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use crate::error::AppError;
+use rust_i18n::t;
 
 /// Retorna la ruta al archivo de historial: `~/.local/share/tmenu/history.log`
 fn history_file_path() -> Result<PathBuf, AppError> {
     let home = dirs::home_dir().ok_or_else(|| {
-        AppError::HistoryError("No se pudo determinar el directorio home".to_string())
+        AppError::HistoryError(t!("errors.home_dir_not_found").to_string())
     })?;
     Ok(home.join(".local/share/tmenu/history.log"))
 }
@@ -19,11 +20,11 @@ fn ensure_history_dir() -> Result<(), AppError> {
     let history_path = history_file_path()?;
     let dir = history_path
         .parent()
-        .ok_or_else(|| AppError::HistoryError("Ruta de historial inválida".to_string()))?;
+        .ok_or_else(|| AppError::HistoryError(t!("errors.invalid_history_path").to_string()))?;
 
     if !dir.exists() {
         fs::create_dir_all(dir)
-            .map_err(|e| AppError::HistoryError(format!("No se pudo crear directorio: {}", e)))?;
+            .map_err(|e| AppError::HistoryError(format!("{} {}", t!("errors.dir_creation_failed"), e)))?;
     }
     Ok(())
 }
@@ -45,10 +46,10 @@ pub fn log_command(cmd: &str) -> Result<(), AppError> {
         .create(true)
         .append(true)
         .open(&history_path)
-        .map_err(|e| AppError::HistoryError(format!("No se pudo abrir historial: {}", e)))?;
+        .map_err(|e| AppError::HistoryError(format!("{} {}", t!("errors.history_open_failed"), e)))?;
 
     file.write_all(entry.as_bytes())
-        .map_err(|e| AppError::HistoryError(format!("No se pudo escribir historial: {}", e)))?;
+        .map_err(|e| AppError::HistoryError(format!("{} {}", t!("errors.history_write_failed"), e)))?;
 
     Ok(())
 }
