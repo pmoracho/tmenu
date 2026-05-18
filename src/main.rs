@@ -38,14 +38,26 @@ struct Args {
     /// Activa el modo depuracion
     #[arg(short, long)]
     debug: bool,
+
+    #[arg(long)]
+    lang: Option<String>,
 }
 
 rust_i18n::i18n!("locales");
 
+fn detect_locale() -> String {
+    let locale = sys_locale::get_locale().unwrap_or("en".into());
+
+    if locale.starts_with("es") {
+        "es".into()
+    } else {
+        "en".into()
+    }
+}
+
+
 /// Función principal: configura el terminal, maneja errores y ejecuta la app.
 fn main() {
-    let idioma_compilacion = option_env!("RUST_I18N_DEFAULT_LOCALE").unwrap_or("en");
-    rust_i18n::set_locale(idioma_compilacion);
 
     // registrar un hook de pánico:
     let original_hook = std::panic::take_hook();
@@ -65,7 +77,9 @@ fn main() {
 /// Configura el terminal en modo raw, ejecuta el ciclo principal de eventos, y
 /// asegura restaurar el estado del terminal al salir, incluso si ocurre un error.
 fn run() -> Result<(), AppError> {
-    let args = Args::parse();
+    let args: Args = Args::parse();
+    let locale = args.lang.unwrap_or_else(detect_locale);
+    rust_i18n::set_locale(&locale);
 
     let mut app = App::from_toon(&args.menu_file, args.debug).map_err(|e| match e {
         AppError::IoError(ref io) if io.kind() == io::ErrorKind::NotFound => {
