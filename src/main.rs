@@ -1,3 +1,6 @@
+rust_i18n::i18n!("locales");
+use rust_i18n::t;
+
 /// Lector de menus interactivos TUI en Rust utilizando Ratatui y Clap.
 /// El programa carga un menú desde un archivo `.toon`, muestra una interfaz de texto
 /// para navegar y ejecutar comandos, con soporte para búsqueda fuzzy, historial,
@@ -13,7 +16,6 @@ mod ui;
 use app::App;
 use error::AppError;
 
-use clap::Parser;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -23,27 +25,12 @@ use ratatui::{Terminal, backend::CrosstermBackend};
 use std::io;
 use std::path::PathBuf;
 
-#[derive(Parser, Debug)]
-#[command(
-    author,
-    version,
-    about,
-    long_about = None
-)]
+#[derive(Debug)]
 struct Args {
-    /// Ruta al archivo de menu (.toon)
-    #[arg(value_name = "ARCHIVO", default_value = "tmenu.toon")]
     menu_file: PathBuf,
-
-    /// Activa el modo depuracion
-    #[arg(short, long)]
     debug: bool,
-
-    #[arg(long)]
     lang: Option<String>,
 }
-
-rust_i18n::i18n!("locales");
 
 fn detect_locale() -> String {
     let locale = sys_locale::get_locale().unwrap_or("en".into());
@@ -77,9 +64,104 @@ fn main() {
 /// Configura el terminal en modo raw, ejecuta el ciclo principal de eventos, y
 /// asegura restaurar el estado del terminal al salir, incluso si ocurre un error.
 fn run() -> Result<(), AppError> {
-    let args: Args = Args::parse();
-    let locale = args.lang.unwrap_or_else(detect_locale);
+    // PASO 1: Parsear manualmente --lang de std::env::args si existe
+    let args_vec: Vec<String> = std::env::args().collect();
+    let cli_lang = args_vec
+        .windows(2)
+        .find(|w| w[0] == "--lang")
+        .map(|w| w[1].clone());
+
+    // PASO 2: Decidir qué locale usar
+    let locale = if let Some(lang) = cli_lang {
+        // Si pasó --lang, usar eso
+        lang
+    } else {
+        // Si no, detectar locale del sistema
+        std::env::var("LANG")
+            .ok()
+            .and_then(|l| {
+                if l.starts_with("es") {
+                    Some("es".to_string())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| detect_locale())
+    };
+
+    // PASO 3: Establecer locale ANTES de crear help
     rust_i18n::set_locale(&locale);
+
+    // PASO 4: Crear ayuda localizada dinámicamente
+    let about: &'static str = Box::leak(t!("args.about").to_string().into_boxed_str());
+    let author: &'static str = Box::leak(t!("args.author").to_string().into_boxed_str());
+    let menu_file_help: &'static str = Box::leak(t!("args.menu_file").to_string().into_boxed_str());
+    let debug_help: &'static str = Box::leak(t!("args.debug").to_string().into_boxed_str());
+    let lang_help: &'static str = Box::leak(t!("args.lang").to_string().into_boxed_str());
+    let usage_text: &'static str = Box::leak(t!("clap.usage").to_string().into_boxed_str());
+    let arguments_text: &'static str = Box::leak(t!("clap.arguments").to_string().into_boxed_str());
+    // let options_text: &'static str = Box::leak(t!("clap.options").to_string().into_boxed_str());
+    // let help_text: &'static str = Box::leak(t!("clap.help").to_string().into_boxed_str());
+    // let version_text: &'static str = Box::leak(t!("clap.version").to_string().into_boxed_str());
+
+    let help_template = format!(
+        "{{about}}\n{usage_text}: {{usage}}\n\n{arguments_text}{tab}{{all-args}}",
+        usage_text = usage_text,
+        arguments_text = arguments_text,
+        tab = "    " // 4 espacios para alinear con el texto de los argumentos
+    );
+
+    let cmd = clap::Command::new("tmenu")
+        .version(env!("CARGO_PKG_VERSION"))
+        .about(about)
+        .author(author)
+        .help_template(&help_template)
+        .arg(
+            clap::Arg::new("menu_file")
+                .value_name("ARCHIVO")
+                .default_value("tmenu.toon")
+                .help(menu_file_help)
+                .index(1)
+        )
+        .arg(
+            clap::Arg::new("debug")
+                .short('d')
+                .long("debug")
+                .help(debug_help)
+                .action(clap::ArgAction::SetTrue)
+        )
+        .arg(
+            clap::Arg::new("lang")
+                .long("lang")
+                .help(lang_help)
+                .value_name("LANG")
+        );
+
+    // PASO 5: Parsear los argumentos
+    let matches = cmd.try_get_matches()
+        .unwrap_or_else(|e: clap::error::Error| e.exit());
+
+    // PASO 6: Extraer valores manualmente
+    let menu_file = matches.get_one::<String>("menu_file")
+        .map(|s| s.as_str())
+        .unwrap_or("tmenu.toon")
+        .into();
+
+    let debug = matches.get_flag("debug");
+
+    let lang = matches.get_one::<String>("lang")
+        .cloned();
+
+    let args = Args {
+        menu_file,
+        debug,
+        lang,
+    };
+
+    // PASO 7: Si se especificó --lang, cambiar locale nuevamente (por si acaso)
+    if let Some(lang) = args.lang {
+        rust_i18n::set_locale(&lang);
+    }
 
     let mut app = App::from_toon(&args.menu_file, args.debug).map_err(|e| match e {
         AppError::IoError(ref io) if io.kind() == io::ErrorKind::NotFound => {

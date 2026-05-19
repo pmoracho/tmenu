@@ -62,3 +62,18 @@ app:
 
   prompts:
     press_enter: "Presioná Enter para volver al menú..."
+
+args:
+  about: "Un menú interactivo y configurable para terminales"
+  author: "Patricio Moracho"
+  menu_file: "Ruta al archivo de menú"
+  debug: "Activa el modo depuración"
+  lang: "Idioma (es/en)"
+
+clap:
+  usage: "Uso"
+  arguments: "Argumentos"
+  options: "Opciones"
+  default: "por defecto"
+  help: "Muestra la ayuda"
+  version: "Muestra la versión"
