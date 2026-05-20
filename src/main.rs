@@ -99,16 +99,14 @@ fn run() -> Result<(), AppError> {
     let debug_help: &'static str = Box::leak(t!("args.debug").to_string().into_boxed_str());
     let lang_help: &'static str = Box::leak(t!("args.lang").to_string().into_boxed_str());
     let usage_text: &'static str = Box::leak(t!("clap.usage").to_string().into_boxed_str());
-    let arguments_text: &'static str = Box::leak(t!("clap.arguments").to_string().into_boxed_str());
+    // let arguments_text: &'static str = Box::leak(t!("clap.arguments").to_string().into_boxed_str());
     // let options_text: &'static str = Box::leak(t!("clap.options").to_string().into_boxed_str());
     // let help_text: &'static str = Box::leak(t!("clap.help").to_string().into_boxed_str());
     // let version_text: &'static str = Box::leak(t!("clap.version").to_string().into_boxed_str());
 
     let help_template = format!(
-        "{{about}}\n{usage_text}: {{usage}}\n\n{arguments_text}{tab}{{all-args}}",
-        usage_text = usage_text,
-        arguments_text = arguments_text,
-        tab = "    " // 4 espacios para alinear con el texto de los argumentos
+        "{{about}}\n{usage_text}: {{usage}}\n\n{{all-args}}",
+        usage_text = usage_text
     );
 
     let cmd = clap::Command::new("tmenu")

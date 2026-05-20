@@ -1,0 +1,72 @@
+args:
+  about: "Un menú interactivo y configurable para terminales"
+  author: "Patricio Moracho"
+  debug: "Activa el modo depuración"
+  lang: "Idioma (es/en)"
+  menu_file: "Ruta al archivo de menú"
+
+clap:
+  arguments: "Argumentos"
+  help: "Muestra la ayuda"
+  options: "Opciones"
+  usage: "Uso"
+  version: "Muestra la versión"
+
+errors:
+  alt_screen_restore: "[warn] no se pudo restaurar pantalla alternativa:"
+  dir_creation_failed: "No se pudo crear el directorio:"
+  event_error: "Error de evento de terminal: {msg}"
+  execution_failed: "[error] no se pudo ejecutar"
+  forbidden_command: "El comando contiene caracteres no permitidos: '{command}'"
+  history_error: "Error al guardar historial: {msg}"
+  history_open_failed: "No se pudo abrir el historial:"
+  history_save: "[warn] no se pudo guardar en historial:"
+  history_write_failed: "No se pudo escribir el historial:"
+  home_dir_not_found: "No se pudo determinar el directorio home"
+  invalid_history_path: "Ruta de historial inválida"
+  io_error: "Error de I/O: {error}"
+  menu_file_not_found: "El archivo de menú no fue encontrado: {path}"
+  raw_mode_enable: "[warn] no se pudo activar raw mode:"
+  terminal_error: "Error de terminal: {msg}"
+  terminal_restore: "[warn] no se pudo restaurar la terminal:"
+
+logs:
+  debugging: "[debug] ejecutando:"
+
+prompts:
+  press_enter: "Presioná Enter para volver al menú..."
+
+ui:
+  confirm:
+    bottom_hints: " [Enter] Confirmar  [Esc] Cancelar "
+    "no": "  [ No ]  "
+    title: " ¿Ejecutar comando? "
+    "yes": "  [ Sí ]  "
+  help:
+    bottom_hints: " [Esc] [F1] Cerrar "
+    keys:
+      back: "Volver al menú anterior / limpiar la búsqueda"
+      filter: "Escribe para filtrar en vivo"
+      help: "Mostrar / cerrar esta ayuda"
+      navigate: "Navegar ítems (↑↓ funciona en el modo búsqueda)"
+      preview: "Mostrar / ocultar vista previa"
+      quit: "Salir de la aplicación"
+      root: "Ir al menú raíz"
+      search: "Activar / cerrar búsqueda"
+      select: "Seleccionar / entrar al submenú"
+    title: " Ayuda — Atajos de teclado "
+  menu:
+    hint_root: " [Ctrl+q] Salir "
+    hint_submenu: " [<-] Volver [Ctrl+q] Salir "
+  preview:
+    no_selection: "(sin selección)"
+    title: " Comando a ejecutar "
+  search:
+    hints_empty: " [Tab] Cerrar "
+    hints_no_results: " [Esc] Limpiar [Tab] Cerrar "
+    hints_results: " [Tab] Cerrar [Esc] Limpiar "
+    no_results: " 🔍 Sin resultados "
+    results: " 🔍 Búsqueda: {count} resultados "
+    title: " 🔍 Búsqueda "
+  wizard:
+    bottom_hints: " [Enter] Confirmar [Esc] Cancelar "

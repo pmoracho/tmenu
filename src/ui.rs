@@ -369,7 +369,7 @@ fn render_help_modal(f: &mut Frame) {
         })
         .collect();
 
-    let table = Table::new(rows, [Constraint::Length(18), Constraint::Min(50)])
+    let table = Table::new(rows, [Constraint::Length(20), Constraint::Min(30)])
         .block(
             Block::default()
                 .title(t!("ui.help.title"))
@@ -381,7 +381,7 @@ fn render_help_modal(f: &mut Frame) {
         )
         .column_spacing(1);
 
-    let popup_w: u16 = 60;
+    let popup_w: u16 = 50;
     let popup_h: u16 = shortcuts.len() as u16 + 2;
     let area = centered_rect(popup_w, popup_h, f.area());
 

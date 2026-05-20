@@ -1,0 +1,72 @@
+args:
+  about: "An interactive and configurable menu for terminals"
+  author: "Patricio Moracho"
+  debug: "Enable debug mode"
+  lang: "Language (es/en)"
+  menu_file: "Path to menu file"
+
+clap:
+  arguments: "Arguments"
+  help: "Print help"
+  options: "Options"
+  usage: "Usage"
+  version: "Print version"
+
+errors:
+  alt_screen_restore: "Failed to restore alternate screen:"
+  dir_creation_failed: "Failed to create directory:"
+  event_error: "Event error: {msg}"
+  execution_failed: "Execution failed"
+  forbidden_command: "Forbidden command: {command}"
+  history_error: "History error: {msg}"
+  history_open_failed: "Failed to open history file:"
+  history_save: "Failed to save to history:"
+  history_write_failed: "Failed to write to history:"
+  home_dir_not_found: "Home directory not found"
+  invalid_history_path: "Invalid history path"
+  io_error: "Input/output error: {error}"
+  menu_file_not_found: "Menu file not found: {path}"
+  raw_mode_enable: "Failed to enable raw mode:"
+  terminal_error: "Terminal error: {msg}"
+  terminal_restore: "Failed to restore terminal:"
+
+logs:
+  debugging: "[DEBUG]"
+
+prompts:
+  press_enter: "Press Enter to continue..."
+
+ui:
+  confirm:
+    bottom_hints: "↑↓: choose | Enter: confirm | Esc: cancel | Y/N: shortcuts"
+    "no": "No"
+    title: "Confirm execution"
+    "yes": "Yes"
+  help:
+    bottom_hints: "Esc or F1 to close"
+    keys:
+      back: "Go back/exit"
+      filter: "Filter results"
+      help: "Show this help"
+      navigate: "Navigate up/down"
+      preview: "Toggle preview"
+      quit: "Quit application"
+      root: "Go to root menu"
+      search: "Activate search"
+      select: "Select/enter"
+    title: "Help"
+  menu:
+    hint_root: "Esc to exit"
+    hint_submenu: "Esc to go back"
+  preview:
+    no_selection: "No selection"
+    title: "Preview"
+  search:
+    hints_empty: "Type to filter | Tab: close"
+    hints_no_results: "No results found"
+    hints_results: "Enter: select | Esc: cancel | Backspace: delete"
+    no_results: "No results"
+    results: "Results: {count}"
+    title: "🔍 Search"
+  wizard:
+    bottom_hints: "Enter: next | Esc: cancel"
