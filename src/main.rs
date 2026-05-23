@@ -32,6 +32,9 @@ struct Args {
     lang: Option<String>,
 }
 
+/// Detecta el locale del sistema y devuelve "es" o "en" según corresponda.
+/// Si no se puede detectar, devuelve "en" por defecto.
+/// Esto se usa como fallback si no se especifica --lang y LANG no es claro.
 fn detect_locale() -> String {
     let locale = sys_locale::get_locale().unwrap_or("en".into());
 

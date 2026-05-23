@@ -15,26 +15,26 @@ clap:
 errors:
   alt_screen_restore: "Failed to restore alternate screen:"
   dir_creation_failed: "Failed to create directory:"
-  event_error: "Event error: {msg}"
+  event_error: "Event error: %{msg}"
   execution_failed: "Execution failed"
-  forbidden_command: "Forbidden command: {command}"
-  history_error: "History error: {msg}"
+  forbidden_command: "Forbidden command: %{command}"
+  history_error: "History error: %{msg}"
   history_open_failed: "Failed to open history file:"
   history_save: "Failed to save to history:"
   history_write_failed: "Failed to write to history:"
   home_dir_not_found: "Home directory not found"
   invalid_history_path: "Invalid history path"
-  io_error: "Input/output error: {error}"
-  menu_file_not_found: "Menu file not found: {path}"
+  io_error: "Input/output error: %{error}"
+  menu_file_not_found: "Menu file not found: %{path}"
   raw_mode_enable: "Failed to enable raw mode:"
-  terminal_error: "Terminal error: {msg}"
+  terminal_error: "Terminal error: %{msg}"
   terminal_restore: "Failed to restore terminal:"
 
 logs:
   debugging: "[DEBUG]"
 
 prompts:
-  press_enter: "Press Enter to continue..."
+  press_any_key: "Press any key to continue..."
 
 ui:
   confirm:
@@ -43,7 +43,7 @@ ui:
     title: "Confirm execution"
     "yes": "Yes"
   help:
-    bottom_hints: "Esc or F1 to close"
+    bottom_hints: " Esc or F1 to close "
     keys:
       back: "Go back/exit"
       filter: "Filter results"
@@ -54,19 +54,19 @@ ui:
       root: "Go to root menu"
       search: "Activate search"
       select: "Select/enter"
-    title: "Help"
+    title: " Help "
   menu:
-    hint_root: "Esc to exit"
-    hint_submenu: "Esc to go back"
+    hint_root: " Esc to exit "
+    hint_submenu: " Esc to go back "
   preview:
     no_selection: "No selection"
     title: "Preview"
   search:
-    hints_empty: "Type to filter | Tab: close"
-    hints_no_results: "No results found"
-    hints_results: "Enter: select | Esc: cancel | Backspace: delete"
-    no_results: "No results"
-    results: "Results: {count}"
-    title: "🔍 Search"
+    hints_empty: " Type to filter | Tab: close "
+    hints_no_results: " No results found "
+    hints_results: " Enter | Esc | Backspace "
+    no_results: " No results "
+    results: " Results: %{count} "
+    title: " 🔍 Search "
   wizard:
-    bottom_hints: "Enter: next | Esc: cancel"
+    bottom_hints: " Enter: next | Esc: cancel "

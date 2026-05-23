@@ -44,16 +44,22 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     let title = app.breadcrumb();
     let title_w = title.chars().count();
 
-    let max_label_w = app
-        .current_items
+    // En modo search, usar filtered_items; sino, usar current_items
+    let items_for_sizing = if app.search_mode {
+        &items_to_render
+    } else {
+        &app.current_items
+    };
+
+    let max_label_w = items_for_sizing
         .iter()
         .map(|item| item.label.chars().count())
         .max()
         .unwrap_or(0);
     let max_w = max_label_w.max(title_w);
 
-    let box_width = (max_w + 14).max(24) as u16;
-    let box_height = (app.current_items.len() + 7).max(8) as u16;
+    let box_width = (max_w + 14).max(36) as u16;
+    let box_height = (items_for_sizing.len() + 7).max(8) as u16;
 
     let area = centered_rect(box_width, box_height, f.area());
 

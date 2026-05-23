@@ -15,26 +15,26 @@ clap:
 errors:
   alt_screen_restore: "[warn] no se pudo restaurar pantalla alternativa:"
   dir_creation_failed: "No se pudo crear el directorio:"
-  event_error: "Error de evento de terminal: {msg}"
+  event_error: "Error de evento de terminal: %{msg}"
   execution_failed: "[error] no se pudo ejecutar"
-  forbidden_command: "El comando contiene caracteres no permitidos: '{command}'"
-  history_error: "Error al guardar historial: {msg}"
+  forbidden_command: "El comando contiene caracteres no permitidos: '%{command}'"
+  history_error: "Error al guardar historial: %{msg}"
   history_open_failed: "No se pudo abrir el historial:"
   history_save: "[warn] no se pudo guardar en historial:"
   history_write_failed: "No se pudo escribir el historial:"
   home_dir_not_found: "No se pudo determinar el directorio home"
   invalid_history_path: "Ruta de historial inválida"
-  io_error: "Error de I/O: {error}"
-  menu_file_not_found: "El archivo de menú no fue encontrado: {path}"
+  io_error: "Error de I/O: %{error}"
+  menu_file_not_found: "El archivo de menú no fue encontrado: %{path}"
   raw_mode_enable: "[warn] no se pudo activar raw mode:"
-  terminal_error: "Error de terminal: {msg}"
+  terminal_error: "Error de terminal: %{msg}"
   terminal_restore: "[warn] no se pudo restaurar la terminal:"
 
 logs:
   debugging: "[debug] ejecutando:"
 
 prompts:
-  press_enter: "Presioná Enter para volver al menú..."
+  press_any_key: "Presioná cualquier tecla para continuar..."
 
 ui:
   confirm:
@@ -66,7 +66,7 @@ ui:
     hints_no_results: " [Esc] Limpiar [Tab] Cerrar "
     hints_results: " [Tab] Cerrar [Esc] Limpiar "
     no_results: " 🔍 Sin resultados "
-    results: " 🔍 Búsqueda: {count} resultados "
+    results: " 🔍 Búsqueda: %{count} resultados "
     title: " 🔍 Búsqueda "
   wizard:
     bottom_hints: " [Enter] Confirmar [Esc] Cancelar "

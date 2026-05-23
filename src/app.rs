@@ -269,9 +269,15 @@ impl App {
                 Err(e) => eprintln!("{} '{}': {}", t!("errors.execution_failed"), bin, e),
             }
         }
+        println!("\n{}", t!("prompts.press_any_key"));
 
-        println!("\n{}", t!("prompts.press_enter"));
-        let _ = io::stdin().read_line(&mut String::new());
+        // Habilitar raw mode para detectar cualquier tecla sin buffering
+        if let Err(e) = enable_raw_mode() {
+            eprintln!("{} {}", t!("errors.raw_mode_enable"), e);
+        }
+        let _ = wait_for_any_key();
+        // Deshabilitar raw mode antes de restaurar la pantalla alternativa
+        let _ = disable_raw_mode();
 
         // Volver a modo TUI
         if let Err(e) = enable_raw_mode() {
@@ -414,5 +420,22 @@ impl WizardState {
             cmd = cmd.replace(&param.placeholder, value);
         }
         cmd
+    }
+}
+
+/// Espera a que el usuario presione cualquier tecla usando crossterm.
+/// Ignora eventos que no sean de teclado y retorna cuando detecta una tecla.
+fn wait_for_any_key() -> Result<(), std::io::Error> {
+    use crossterm::event::{self, KeyEventKind};
+
+    loop {
+        if let Ok(event) = event::read() {
+            if let crossterm::event::Event::Key(key_event) = event {
+                // Solo procesar eventos de tecla presionada (ignorar repetición)
+                if key_event.kind == KeyEventKind::Press {
+                    return Ok(());
+                }
+            }
+        }
     }
 }
