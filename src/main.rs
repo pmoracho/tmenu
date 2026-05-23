@@ -143,10 +143,20 @@ fn run() -> Result<(), AppError> {
         .unwrap_or_else(|e: clap::error::Error| e.exit());
 
     // PASO 6: Extraer valores manualmente
-    let menu_file = matches.get_one::<String>("menu_file")
+    let menu_file: PathBuf = matches.get_one::<String>("menu_file")
         .map(|s| s.as_str())
         .unwrap_or("tmenu.toon")
         .into();
+
+    // Si no existe el menu en la carpeta actual, buscar en el home
+    let menu_file = if !menu_file.exists() {
+        let home_menu = dirs::home_dir().map(|h| h.join("tmenu.toon"))
+            .filter(|p| p.exists())
+            .unwrap_or(menu_file);
+        home_menu
+    } else {
+        menu_file
+    };
 
     let debug = matches.get_flag("debug");
 
@@ -175,8 +185,12 @@ fn run() -> Result<(), AppError> {
     let mut stdout = io::stdout();
     execute!(stdout, crossterm::cursor::SetCursorStyle::SteadyUnderScore)
         .map_err(|e| AppError::TerminalError(e.to_string()))?;
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)
-        .map_err(|e| AppError::TerminalError(e.to_string()))?;
+
+    let is_tty_native = std::env::var("TERM").unwrap_or_default() == "linux";
+    if !is_tty_native {
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)
+            .map_err(|e| AppError::TerminalError(e.to_string()))?;
+    }
 
     let backend = CrosstermBackend::new(stdout);
     let mut terminal =

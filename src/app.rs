@@ -283,8 +283,12 @@ impl App {
         if let Err(e) = enable_raw_mode() {
             eprintln!("{} {}", t!("errors.raw_mode_enable"), e);
         }
-        if let Err(e) = execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture) {
-            eprintln!("{} {}", t!("errors.alt_screen_restore"), e);
+
+        let is_tty_native = std::env::var("TERM").unwrap_or_default() == "linux";
+        if !is_tty_native {
+            if let Err(e) = execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture) {
+                eprintln!("{} {}", t!("errors.alt_screen_restore"), e);
+            }
         }
         terminal
             .clear()
