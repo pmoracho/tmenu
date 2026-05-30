@@ -484,6 +484,11 @@ fn handle_navigation_mode(
 ) -> Result<bool, AppError> {
     match key {
         KeyCode::Tab => app.search_mode = true,
+        KeyCode::Char(c) => {
+            app.search_mode = true;
+            app.search_text.push(c);
+            app.state.select(Some(0));
+        }
         KeyCode::Down => app.next(),
         KeyCode::Up => app.previous(),
         KeyCode::Home => app.go_home(),
