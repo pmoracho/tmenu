@@ -6,7 +6,7 @@
 
 Define a menu tree in a plain-text `.toon` config file, and tmenu turns it into a navigable, searchable launcher for your shell commands — no more digging through `history` or aliases you forgot the name of.
 
-📖 **[Full usage tutorial](tutorial/tutorial.md)** (with screenshots)
+📖 **[Full usage tutorial (In spanish)](tutorial/tutorial.md)** (with screenshots)
 
 ## Features
 
