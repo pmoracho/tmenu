@@ -4,6 +4,7 @@ args:
   debug: "Activa el modo depuración"
   lang: "Idioma (es/en)"
   menu_file: "Ruta al archivo de menú"
+  file_name: "ARCHIVO"
 
 clap:
   arguments: "Argumentos"

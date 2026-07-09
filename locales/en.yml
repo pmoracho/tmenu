@@ -4,6 +4,7 @@ args:
   debug: "Enable debug mode"
   lang: "Language (es/en)"
   menu_file: "Path to menu file"
+  file_name: "FILE"
 
 clap:
   arguments: "Arguments"

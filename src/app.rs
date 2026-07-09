@@ -16,7 +16,6 @@ use crate::model::{
 use crate::parser::parse_toon_file;
 use crate::search::{filter_recursive, find_first_command};
 use crate::{error::AppError, history, parser};
-// Asumiendo que tu macro t! se expone o importa desde aquí
 
 /// Estado principal de la aplicación TUI.
 pub struct App {

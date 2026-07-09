@@ -15,7 +15,7 @@ fn history_file_path() -> Result<PathBuf, AppError> {
 }
 
 /// Asegura que el directorio `~/.local/share/tmenu/` existe.
-/// Si no existe, lo crea con permisos estándar (0o755).
+/// Si no existe, lo crea con permisos estándar (755).
 fn ensure_history_dir() -> Result<(), AppError> {
     let history_path = history_file_path()?;
     let dir = history_path

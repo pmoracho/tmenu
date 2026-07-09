@@ -58,7 +58,6 @@ fn main() {
     }));
 
     if let Err(err) = run() {
-        // Aquí es donde ocurre la magia: {} usa tu impl fmt::Display
         eprintln!("\n❌ Error: {}", err);
         std::process::exit(1);
     }
@@ -67,6 +66,7 @@ fn main() {
 /// Configura el terminal en modo raw, ejecuta el ciclo principal de eventos, y
 /// asegura restaurar el estado del terminal al salir, incluso si ocurre un error.
 fn run() -> Result<(), AppError> {
+
     // PASO 1: Parsear manualmente --lang de std::env::args si existe
     let args_vec: Vec<String> = std::env::args().collect();
     let cli_lang = args_vec
@@ -101,11 +101,8 @@ fn run() -> Result<(), AppError> {
     let menu_file_help: &'static str = Box::leak(t!("args.menu_file").to_string().into_boxed_str());
     let debug_help: &'static str = Box::leak(t!("args.debug").to_string().into_boxed_str());
     let lang_help: &'static str = Box::leak(t!("args.lang").to_string().into_boxed_str());
+    let file_name: &'static str = Box::leak(t!("args.file_name").to_string().into_boxed_str());
     let usage_text: &'static str = Box::leak(t!("clap.usage").to_string().into_boxed_str());
-    // let arguments_text: &'static str = Box::leak(t!("clap.arguments").to_string().into_boxed_str());
-    // let options_text: &'static str = Box::leak(t!("clap.options").to_string().into_boxed_str());
-    // let help_text: &'static str = Box::leak(t!("clap.help").to_string().into_boxed_str());
-    // let version_text: &'static str = Box::leak(t!("clap.version").to_string().into_boxed_str());
 
     let help_template = format!(
         "{{about}}\n{usage_text}: {{usage}}\n\n{{all-args}}",
@@ -119,7 +116,7 @@ fn run() -> Result<(), AppError> {
         .help_template(&help_template)
         .arg(
             clap::Arg::new("menu_file")
-                .value_name("ARCHIVO")
+                .value_name(file_name)
                 .default_value("tmenu.toon")
                 .help(menu_file_help)
                 .index(1)
@@ -148,7 +145,7 @@ fn run() -> Result<(), AppError> {
         .unwrap_or("tmenu.toon")
         .into();
 
-    // Si no existe el menu en la carpeta actual, buscar en el home
+    // Si no existe el menu en la carpeta actual, buscar en el home del usuario
     let menu_file = if !menu_file.exists() {
         let home_menu = dirs::home_dir().map(|h| h.join("tmenu.toon"))
             .filter(|p| p.exists())
@@ -159,7 +156,6 @@ fn run() -> Result<(), AppError> {
     };
 
     let debug = matches.get_flag("debug");
-
     let lang = matches.get_one::<String>("lang")
         .cloned();
 
@@ -186,6 +182,9 @@ fn run() -> Result<(), AppError> {
     execute!(stdout, crossterm::cursor::SetCursorStyle::SteadyUnderScore)
         .map_err(|e| AppError::TerminalError(e.to_string()))?;
 
+    // Si el terminal es "linux", no usar pantalla alterna ni captura de mouse, porque ese terminal no
+    // las soporta bien. En cambio, en otros terminales (xterm, Windows Terminal, etc) sí usar pantalla
+    // alterna para evitar problemas de redibujado al salir. Esto se detecta por la variable de entorno TERM.
     let is_tty_native = std::env::var("TERM").unwrap_or_default() == "linux";
     if !is_tty_native {
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture)
@@ -228,13 +227,13 @@ fn run_app(
             }
             if key.code == KeyCode::F(1) {
                 app.show_help = true;
-                let quit = run_help_modal(terminal, app)?; // ← ahora retorna bool
+                let quit = run_help_modal(terminal, app)?;
                 if quit {
                     return Ok(());
                 }
                 continue;
             }
-            // Ctrl+q sale desde cualquier modo
+            // Ctrl+q sale desde cualquier modo y menu, incluso dentro de modales o wizards
             if key.modifiers.contains(event::KeyModifiers::CONTROL)
                 && key.code == KeyCode::Char('q')
             {
@@ -289,8 +288,7 @@ fn run_help_modal(
     }
 }
 
-/// Loop bloqueante del wizard de interpolación.
-/// Retorna Ok(true) si el usuario canceló, Ok(false) si completó.
+/// Loop bloqueante del wizard para interpolación de variables.
 fn run_wizard(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     app: &mut App,
@@ -350,7 +348,6 @@ fn run_wizard(
 }
 
 /// Loop bloqueante del modal de confirmación.
-/// Retorna true si el usuario confirmó (Sí), false si canceló (No).
 pub fn run_confirmation_modal(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     app: &mut App,
