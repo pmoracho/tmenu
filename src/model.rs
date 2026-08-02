@@ -35,6 +35,8 @@ pub struct MenuItem {
     /// Si true, pedir confirmación antes de ejecutar este comando.
     /// Default: true (seguro por defecto).
     pub require_confirmation: bool,
+    /// Si true, ejecutar el comando en un shell (bash/sh) para poder usar pipes, variables, etc.
+    pub require_shell: bool,
 }
 
 /// Entrada del historial de navegación para poder volver atrás.

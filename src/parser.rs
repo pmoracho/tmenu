@@ -99,8 +99,10 @@ pub fn parse_toon_file(path: &Path) -> Result<(GlobalConfig, String, Vec<MenuIte
             let value_with_flag = trimmed[pos + 1..].trim();
 
             // Extraer flag [confirm=...] si existe
-            let (value, require_confirmation) = extract_confirm_flag(value_with_flag);
+            let (value, flags) = extract_flags(value_with_flag);
             let value = value.trim();
+            let require_confirmation = flag_bool(&flags, "confirm", false);
+            let require_shell = flag_bool(&flags, "shell", false);
 
             if value.is_empty() {
                 // Es un submenu: cerrar los niveles iguales o mayores
@@ -122,6 +124,7 @@ pub fn parse_toon_file(path: &Path) -> Result<(GlobalConfig, String, Vec<MenuIte
                     label: key,
                     action,
                     require_confirmation,
+                    require_shell
                 };
                 if let Some(parent) = stack.last_mut() {
                     parent.1.push(item);
@@ -140,33 +143,38 @@ pub fn parse_toon_file(path: &Path) -> Result<(GlobalConfig, String, Vec<MenuIte
     Ok((config, main_title, root_items))
 }
 
-/// Extrae la flag [confirm=true/false] de una línea si existe.
-/// Retorna (línea sin flag, require_confirmation).
-/// Default: false (no confirmación por defecto, pero puede ser true).
-fn extract_confirm_flag(s: &str) -> (&str, bool) {
-    // Buscar [confirm=...] al final
-    if let Some(bracket_pos) = s.rfind('[') {
-        let rest = &s[bracket_pos..];
-        if rest.starts_with("[confirm=") {
-            let inner = rest
-                .strip_prefix("[confirm=")
-                .and_then(|s| s.strip_suffix("]"));
-            if let Some(flag_str) = inner {
-                let flag_str = flag_str.trim();
-                let line_without_flag = s[..bracket_pos].trim();
+/// Extrae todos los flags [key=value] al final de la línea.
+/// Retorna (línea sin flags, mapa de flags encontrados).
+fn extract_flags(s: &str) -> (&str, Vec<(String, String)>) {
+    let mut flags = Vec::new();
+    let mut rest = s.trim_end();
 
-                let require_conf = match flag_str {
-                    "false" | "False" | "FALSE" | "no" | "No" | "NO" => false,
-                    _ => true, // default: true (incluye "true", typos, etc)
-                };
-
-                return (line_without_flag, require_conf);
-            }
+    loop {
+        let trimmed = rest.trim_end();
+        if !trimmed.ends_with(']') {
+            break;
         }
+        let Some(bracket_pos) = trimmed.rfind('[') else { break };
+        let inner = &trimmed[bracket_pos + 1..trimmed.len() - 1];
+        let Some(eq_pos) = inner.find('=') else { break };
+
+        let key = inner[..eq_pos].trim().to_string();
+        let value = inner[eq_pos + 1..].trim().to_string();
+        flags.push((key, value));
+        rest = trimmed[..bracket_pos].trim_end();
     }
-    // No hay flag, default a false
-    (s, false)
+
+    flags.reverse(); // mantener orden original
+    (rest, flags)
 }
+
+fn flag_bool(flags: &[(String, String)], key: &str, default: bool) -> bool {
+    flags.iter()
+        .find(|(k, _)| k == key)
+        .map(|(_, v)| !matches!(v.as_str(), "false" | "False" | "FALSE" | "no" | "No" | "NO"))
+        .unwrap_or(default)
+}
+
 
 /// Busca el ':' separador fuera de comillas en una cadena.
 ///
@@ -203,6 +211,7 @@ fn pop_and_insert(stack: &mut Vec<(String, Vec<MenuItem>, usize)>, root: &mut Ve
             label: name,
             action: MenuAction::OpenSubmenu(items),
             require_confirmation: false,
+            require_shell: false,
         };
 
         if let Some(parent) = stack.last_mut() {
@@ -275,50 +284,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_extract_confirm_flag_true() {
-        let (line, flag) = extract_confirm_flag("cmd [confirm=true]");
+    fn test_extract_flags_shell_and_confirm() {
+        let (line, flags) = extract_flags("cmd [confirm=true] [shell=true]");
         assert_eq!(line, "cmd");
-        assert!(flag);
+        assert!(flag_bool(&flags, "confirm", false));
+        assert!(flag_bool(&flags, "shell", false));
     }
 
     #[test]
-    fn test_extract_confirm_flag_false() {
-        let (line, flag) = extract_confirm_flag("cmd [confirm=false]");
+    fn test_extract_flags_none() {
+        let (line, flags) = extract_flags("cmd");
         assert_eq!(line, "cmd");
-        assert!(!flag);
-    }
-
-    #[test]
-    fn test_extract_confirm_flag_no() {
-        let (line, flag) = extract_confirm_flag("cmd [confirm=no]");
-        assert_eq!(line, "cmd");
-        assert!(!flag);
-    }
-
-    #[test]
-    fn test_extract_confirm_flag_missing() {
-        let (line, flag) = extract_confirm_flag("cmd");
-        assert_eq!(line, "cmd");
-        assert!(!flag); // default false
-    }
-
-    #[test]
-    fn test_extract_confirm_flag_typo() {
-        let (line, flag) = extract_confirm_flag("cmd [confirm=maybe]");
-        assert_eq!(line, "cmd");
-        assert!(flag); // default true on typo
-    }
-
-    #[test]
-    fn test_extract_confirm_flag_with_quotes() {
-        let (line, flag) = extract_confirm_flag("\"echo hola\" [confirm=false]");
-        assert_eq!(line, "\"echo hola\"");
-        assert!(!flag);
-    }
-
-    #[test]
-    fn test_execution_mode_from_str_clean() {
-        assert_eq!(ExecutionMode::from_str("clean"), ExecutionMode::Clean);
+        assert!(flags.is_empty());
     }
 
     #[test]

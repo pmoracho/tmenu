@@ -161,10 +161,10 @@ impl App {
                 if params.is_empty() {
                     // Sin interpolación: pedir confirmación solo si el ítem lo requiere
                     if item.require_confirmation {
-                        return self.request_command_confirmation(terminal, cmd);
+                        return self.request_command_confirmation(terminal, cmd, item.require_shell);
                     } else {
                         // Ejecutar directo sin confirmación
-                        self.execute_external_command(terminal, cmd)?;
+                        self.execute_external_command(terminal, cmd, item.require_shell)?;
                     }
                 } else {
                     // Con interpolación: iniciar wizard (no ejecutar todavía)
@@ -172,6 +172,7 @@ impl App {
                         params,
                         cmd.to_string(),
                         item.require_confirmation,
+                        item.require_shell
                     ));
                 }
             }
@@ -195,9 +196,10 @@ impl App {
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<Stdout>>,
         cmd: &str,
+        use_shell: bool,
     ) -> Result<bool, AppError> {
         // Validar seguridad ANTES de mostrar cualquier modal
-        if !Self::is_safe_command(cmd) {
+        if !Self::is_safe_command(cmd, use_shell) {
             return Err(AppError::ForbiddenCommand(cmd.to_string()));
         }
 
@@ -208,7 +210,7 @@ impl App {
         let should_execute = crate::run_confirmation_modal(terminal, self)?;
 
         if should_execute {
-            self.execute_external_command(terminal, cmd)?;
+            self.execute_external_command(terminal, cmd, use_shell)?;
         }
 
         Ok(false)
@@ -222,16 +224,23 @@ impl App {
     ///
     /// # Seguridad
     /// - Rechaza comandos con path traversal (`..`).
-    /// - Usa `shlex::split` para respetar quoting correctamente en lugar de
-    ///   `split_whitespace`, que parte argumentos con espacios.
+    /// - Si `use_shell` es `false` (default), usa `shlex::split` para respetar
+    ///   quoting correctamente y spawnea el binario directo, sin intérprete de
+    ///   shell de por medio — `&&`, `|`, `;`, etc. se tratan como argumentos
+    ///   literales, no como sintaxis de shell.
+    /// - Si `use_shell` es `true` (flag `[shell=true]` en el `.toon`), el
+    ///   comando se pasa completo a `sh -c` (Unix) o `cmd /C` (Windows),
+    ///   habilitando `&&`, `|`, redirecciones, etc. Usar con cuidado: el
+    ///   comando se interpreta con reglas de shell.
     /// - Los valores interpolados por el wizard se validan aquí también,
     ///   ya que `finish_wizard` llama a este método con el comando resuelto.
     pub fn execute_external_command(
         &self,
         terminal: &mut Terminal<CrosstermBackend<Stdout>>,
         cmd: &str,
+        use_shell: bool,
     ) -> Result<(), AppError> {
-        if !Self::is_safe_command(cmd) {
+        if !Self::is_safe_command(cmd, use_shell) {
             return Err(AppError::ForbiddenCommand(cmd.to_string()));
         }
 
@@ -250,13 +259,36 @@ impl App {
             let _ = std::process::Command::new("clear").spawn();
         }
 
-        // Parsear respetando quoting ("arg con espacios" se trata como un solo arg).
-        let parts: Vec<String> = shlex::split(cmd)
-            .unwrap_or_else(|| cmd.split_whitespace().map(str::to_string).collect());
+        // Construir el comando según el modo: shell interpretado o spawn directo.
+        let command = if use_shell {
+            #[cfg(windows)]
+            let built = {
+                let mut c = Command::new("cmd");
+                c.args(["/C", cmd]);
+                c
+            };
 
-        if let Some((bin, args)) = parts.split_first() {
-            let mut command = Command::new(bin);
-            command.args(args);
+            #[cfg(not(windows))]
+            let built = {
+                let mut c = Command::new("sh");
+                c.args(["-c", cmd]);
+                c
+            };
+
+            Some(built)
+        } else {
+            // Parsear respetando quoting ("arg con espacios" se trata como un solo arg).
+            let parts: Vec<String> = shlex::split(cmd)
+                .unwrap_or_else(|| cmd.split_whitespace().map(str::to_string).collect());
+
+            parts.split_first().map(|(bin, args)| {
+                let mut c = Command::new(bin);
+                c.args(args);
+                c
+            })
+        };
+
+        if let Some(mut command) = command {
             match command.spawn() {
                 Ok(mut child) => {
                     let _ = child.wait();
@@ -265,9 +297,10 @@ impl App {
                         eprintln!("{} {}", t!("errors.history_save"), e);
                     }
                 }
-                Err(e) => eprintln!("{} '{}': {}", t!("errors.execution_failed"), bin, e),
+                Err(e) => eprintln!("{}: {}", t!("errors.execution_failed"), e),
             }
         }
+
         println!("\n{}", t!("prompts.press_any_key"));
 
         // Habilitar raw mode para detectar cualquier tecla sin buffering
@@ -337,14 +370,15 @@ impl App {
         if let Some(ref wizard) = self.wizard {
             let cmd = wizard.resolve();
             let require_confirmation = wizard.require_confirmation;
+            let require_shell = wizard.require_shell;
             self.wizard = None;
 
             if require_confirmation {
                 // Pedir confirmación antes de ejecutar el comando resuelto
-                return self.request_command_confirmation(terminal, &cmd);
+                return self.request_command_confirmation(terminal, &cmd, require_shell);
             } else {
                 // Ejecutar directo sin confirmación
-                self.execute_external_command(terminal, &cmd)?;
+                self.execute_external_command(terminal, &cmd, require_shell)?;
             }
         }
         Ok(false)
@@ -354,10 +388,14 @@ impl App {
     ///
     /// Nota: no se usan pipes/shell, así que `|`, `&`, `;` no son vectores de inyección
     /// en este contexto — pero `..` sí puede usarse para path traversal en argumentos.
-    fn is_safe_command(cmd: &str) -> bool {
+    fn is_safe_command(cmd: &str, use_shell: bool) -> bool {
+
         // Rechazar path traversal explícito
         if cmd.split_whitespace().any(|part| part.contains("..")) {
             return false;
+        }
+        if use_shell {
+            return true; // Si se permite shell, no filtramos metacaracteres
         }
 
         // Rechazar shell metacaracteres peligrosos (aunque no ejecutemos sh -c)
@@ -379,6 +417,7 @@ impl App {
 }
 
 /// Estado del wizard de interpolación de parámetros.
+/// En la línea de comandos, los placeholders se reemplazan por los valores ingresados por el usuario.
 pub struct WizardState {
     pub params: Vec<CommandParam>,
     pub current: usize,
@@ -386,11 +425,12 @@ pub struct WizardState {
     pub input: String,
     pub original_cmd: String,
     pub require_confirmation: bool,
+    pub require_shell: bool,
 }
 
 /// Implementación de métodos para `WizardState`.
 impl WizardState {
-    pub fn new(params: Vec<CommandParam>, cmd: String, require_confirmation: bool) -> Self {
+    pub fn new(params: Vec<CommandParam>, cmd: String, require_confirmation: bool, require_shell: bool) -> Self {
         let len = params.len();
         WizardState {
             params,
@@ -399,6 +439,7 @@ impl WizardState {
             input: String::new(),
             original_cmd: cmd,
             require_confirmation,
+            require_shell,
         }
     }
 
