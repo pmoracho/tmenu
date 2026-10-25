@@ -23,7 +23,9 @@ impl Default for GlobalConfig {
 
 /// Carga y parsea un archivo `.toon`, retornando la configuración global,
 /// el titulo principal y la lista de items del menu raiz.
-pub fn parse_toon_file(path: &Path) -> Result<(GlobalConfig, String, Vec<MenuItem>), AppError> {
+pub fn parse_toon_file(
+    path: &Path,
+) -> Result<(GlobalConfig, String, Vec<MenuItem>, Vec<String>), AppError> {
     let content = fs::read_to_string(path)?;
     let cleaned_content = clean_invisible_chars(&content);
 
@@ -34,8 +36,9 @@ pub fn parse_toon_file(path: &Path) -> Result<(GlobalConfig, String, Vec<MenuIte
     let mut indent_levels: Vec<usize> = Vec::new();
 
     let mut config_base_indent: Option<usize> = None;
+    let mut warnings: Vec<String> = Vec::new();
 
-    for line in cleaned_content.lines() {
+    for (idx, line) in cleaned_content.lines().enumerate() {
         let normalized = line.replace('\t', "    ");
         if normalized.trim().is_empty() {
             continue;
@@ -116,6 +119,15 @@ pub fn parse_toon_file(path: &Path) -> Result<(GlobalConfig, String, Vec<MenuIte
                     pop_and_insert(&mut stack, &mut root_items);
                 }
                 let raw_value = unquote(value).to_string();
+                for p in unknown_placeholders(&raw_value) {
+                    warnings.push(format!(
+                        "línea {}: '{}' contiene un placeholder desconocido: {}",
+                        idx + 1,
+                        key,
+                        p
+                    ));
+                }
+
                 let action = if raw_value == "exit" {
                     MenuAction::Quit
                 } else {
@@ -141,7 +153,7 @@ pub fn parse_toon_file(path: &Path) -> Result<(GlobalConfig, String, Vec<MenuIte
         pop_and_insert(&mut stack, &mut root_items);
     }
 
-    Ok((config, main_title, root_items))
+    Ok((config, main_title, root_items, warnings))
 }
 
 /// Extrae todos los flags [key=value] al final de la línea.
@@ -252,6 +264,31 @@ pub fn extract_params(cmd: &str) -> Vec<CommandParam> {
         }
     }
     params
+}
+
+/// Devuelve los `{{...}}` de un comando que no son un parámetro válido
+/// (`{{text: Etiqueta}}`). Incluye llaves sin cerrar.
+pub fn unknown_placeholders(cmd: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = cmd;
+
+    while let Some(start) = rest.find("{{") {
+        rest = &rest[start + 2..];
+        match rest.find("}}") {
+            Some(end) => {
+                let inner = rest[..end].trim();
+                if !inner.starts_with("text:") {
+                    out.push(format!("{{{{{}}}}}", inner));
+                }
+                rest = &rest[end + 2..];
+            }
+            None => {
+                out.push(format!("{{{{{}", rest.trim()));
+                break;
+            }
+        }
+    }
+    out
 }
 
 fn clean_invisible_chars(s: &str) -> String {
@@ -389,6 +426,32 @@ mod tests {
     #[test]
     fn test_unquote_comilla_suelta() {
         assert_eq!(unquote("\""), "\"");
+    }
+
+    #[test]
+    fn test_placeholder_valido_no_advierte() {
+        assert!(unknown_placeholders("git tag {{text: Etiqueta}}").is_empty());
+    }
+
+    #[test]
+    fn test_placeholder_typo() {
+        assert_eq!(
+            unknown_placeholders("git tag {{test:Etiquete}}"),
+            vec!["{{test:Etiquete}}".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_placeholder_sin_cerrar() {
+        assert_eq!(
+            unknown_placeholders("echo {{text: x"),
+            vec!["{{text: x".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_sin_placeholders() {
+        assert!(unknown_placeholders("git status").is_empty());
     }
 
 }

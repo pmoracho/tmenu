@@ -37,6 +37,7 @@ logs:
 
 prompts:
   press_any_key: "Press any key to continue..."
+  press_enter_to_continue: "Press Enter to continue..."
 
 ui:
   confirm:

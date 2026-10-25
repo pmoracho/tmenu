@@ -42,7 +42,19 @@ impl App {
     /// Crea una instancia de `App` cargando el menú desde un archivo `.toon`.
     pub fn from_toon(path: &std::path::Path, debug: bool) -> Result<Self, AppError> {
 
-        let (config, main_title, root_items) = parse_toon_file(path)?;
+        let (config, main_title, root_items, warnings) = parse_toon_file(path)?;
+
+        // Se muestra antes de entrar al modo raw / pantalla alternativa.
+        if !warnings.is_empty() {
+            eprintln!("{}:", path.display());
+            for w in &warnings {
+                eprintln!("  [warn] {}", w);
+            }
+            eprintln!("\n{}", t!("prompts.press_enter_to_continue"));
+            let mut _buf = String::new();
+            let _ = io::stdin().read_line(&mut _buf);
+        }
+
         let mut state = ListState::default();
         state.select(Some(0));
 
