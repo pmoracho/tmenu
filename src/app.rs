@@ -14,7 +14,7 @@ use crate::model::{
 };
 
 use crate::parser::parse_toon_file;
-use crate::search::{filter_recursive, find_first_command};
+use crate::search::{filter_recursive};
 use crate::{error::AppError, history, parser};
 
 /// Estado principal de la aplicación TUI.
@@ -69,14 +69,7 @@ impl App {
             return self.current_items.clone();
         }
 
-        let mut results = filter_recursive(&self.current_items, &self.search_text, 0);
-
-        if results.is_empty() {
-            if let Some(fallback) = find_first_command(&self.current_items) {
-                results.push(fallback);
-            }
-        }
-        results
+        filter_recursive(&self.current_items, &self.search_text, 0)
     }
 
     /// Avanza la selección al siguiente ítem (con wrap-around).
@@ -152,7 +145,7 @@ impl App {
         match &item.action.clone() {
             MenuAction::Quit => return Ok(true),
             MenuAction::Execute(cmd_str) => {
-                let cmd = cmd_str.trim().trim_matches('"');
+                let cmd = cmd_str.trim();
                 if cmd == "exit" {
                     return Ok(true);
                 }
@@ -595,4 +588,45 @@ mod tests {
             "git tag -a v1.0.0 -m \"Release v1.0.0\""
         );
     }
+
+    fn app_with_search(text: &str) -> App {
+        let items = vec![MenuItem {
+            label: "Ver estado".into(),
+            action: MenuAction::Execute("git status".into()),
+            require_confirmation: false,
+            require_shell: false,
+        }];
+        let mut state = ListState::default();
+        state.select(Some(0));
+        App {
+            history: Vec::new(),
+            current_title: "t".into(),
+            current_items: items.clone(),
+            root_title: "t".into(),
+            root_items: items,
+            state,
+            search_text: text.into(),
+            search_mode: true,
+            show_preview: false,
+            show_help: false,
+            debug: false,
+            wizard: None,
+            confirmation: None,
+            execution_mode: ExecutionMode::Inherit,
+        }
+    }
+
+    #[test]
+    fn test_search_sin_resultados_devuelve_lista_vacia() {
+        let app = app_with_search("zzz");
+        assert!(app.filtered_items().is_empty());
+    }
+
+    #[test]
+    fn test_search_con_resultado() {
+        let app = app_with_search("est");
+        assert_eq!(app.filtered_items().len(), 1);
+    }
+
+
 }

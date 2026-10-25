@@ -1,5 +1,13 @@
 use crate::model::{MenuAction, MenuItem};
 
+/// Quita un par de comillas dobles solo si envuelven todo el valor
+/// (inicio y fin). `git commit -m "WIP"` queda intacto.
+pub fn unquote(s: &str) -> &str {
+    s.strip_prefix('"')
+        .and_then(|r| r.strip_suffix('"'))
+        .unwrap_or(s)
+}
+
 /// Verifica si `text` contiene los caracteres de `query` en el mismo orden,
 /// sin necesidad de que sean contiguos. La comparación es insensible a mayúsculas.
 pub fn is_fuzzy_match(text: &str, query: &str) -> bool {
@@ -32,23 +40,6 @@ pub fn filter_recursive(items: &[MenuItem], query: &str, depth: usize) -> Vec<Me
         }
     }
     results
-}
-
-/// Retorna el primer ítem ejecutable encontrado en la lista, recorriendo
-/// submenús recursivamente. Usado como fallback cuando la búsqueda no encuentra resultados.
-pub fn find_first_command(items: &[MenuItem]) -> Option<MenuItem> {
-    for item in items {
-        match &item.action {
-            MenuAction::Execute(_) => return Some(item.clone()),
-            MenuAction::Quit => {} // no usar como fallback de búsqueda
-            MenuAction::OpenSubmenu(sub_items) => {
-                if let Some(found) = find_first_command(sub_items) {
-                    return Some(found);
-                }
-            }
-        }
-    }
-    None
 }
 
 #[cfg(test)]

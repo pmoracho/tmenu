@@ -4,6 +4,7 @@ use std::path::Path;
 use crate::error::AppError;
 use crate::model::CommandParam;
 use crate::model::{ExecutionMode, MenuAction, MenuItem};
+use crate::search::unquote;
 
 /// Configuración global del menú extraída del archivo `.toon`.
 #[derive(Clone, Debug)]
@@ -114,7 +115,7 @@ pub fn parse_toon_file(path: &Path) -> Result<(GlobalConfig, String, Vec<MenuIte
                 while stack.last().map_or(false, |e| e.2 >= level) {
                     pop_and_insert(&mut stack, &mut root_items);
                 }
-                let raw_value = value.trim_matches('"').to_string();
+                let raw_value = unquote(value).to_string();
                 let action = if raw_value == "exit" {
                     MenuAction::Quit
                 } else {
@@ -367,4 +368,27 @@ mod tests {
         let clean = clean_invisible_chars(text);
         assert_eq!(clean, "Hola mundo");  // ✅ Texto normal sin cambios
     }
+    #[test]
+    fn test_unquote_envolvente() {
+        assert_eq!(unquote("\"git pull\""), "git pull");
+    }
+
+    #[test]
+    fn test_unquote_conserva_comilla_final_del_argumento() {
+        assert_eq!(
+            unquote("git commit -m \"WIP\""),
+            "git commit -m \"WIP\""
+        );
+    }
+
+    #[test]
+    fn test_unquote_sin_comillas() {
+        assert_eq!(unquote("git status"), "git status");
+    }
+
+    #[test]
+    fn test_unquote_comilla_suelta() {
+        assert_eq!(unquote("\""), "\"");
+    }
+
 }
