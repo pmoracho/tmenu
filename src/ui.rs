@@ -75,7 +75,9 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     render_menu_list(f, app, &items_to_render, menu_area, &title);
     render_search_bar(f, app, chunks[1]);
 
-    if app.wizard.is_some() {
+    if let Some(msg) = &app.error_message {
+        render_error_modal(f, msg);
+    } else if app.wizard.is_some() {
         render_wizard(f, app);
     } else if app.show_help {
         render_help_modal(f);
@@ -84,6 +86,29 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     } else {
         render_preview_popup(f, app, &items_to_render, menu_area);
     }
+}
+
+/// Popup de error: se cierra con cualquier tecla.
+fn render_error_modal(f: &mut Frame, msg: &str) {
+    use ratatui::widgets::{Clear, Wrap};
+
+    let area = centered_rect(64, 7, f.area());
+    f.render_widget(Clear, area);
+
+    let popup = Paragraph::new(msg.to_string())
+        .wrap(Wrap { trim: true })
+        .block(
+            Block::default()
+                .title(t!("ui.errors.title"))
+                .title_alignment(Alignment::Center)
+                .title_bottom(Line::from(t!("ui.errors.bottom_hints")).centered())
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(COLOR_SEARCH_FAIL))
+                .padding(Padding::new(1, 1, 1, 0)),
+        )
+        .style(Style::default().fg(COLOR_HIGHLIGHT_FG));
+    f.render_widget(popup, area);
 }
 
 /// Renderiza el modal del wizard para comandos con parámetros.

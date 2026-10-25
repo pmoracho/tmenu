@@ -33,7 +33,7 @@ pub struct MenuItem {
     pub label: String,
     pub action: MenuAction,
     /// Si true, pedir confirmación antes de ejecutar este comando.
-    /// Default: true (seguro por defecto).
+    /// Default: false (solo se pide confirmación con `[confirm=true]`).
     pub require_confirmation: bool,
     /// Si true, ejecutar el comando en un shell (bash/sh) para poder usar pipes, variables, etc.
     pub require_shell: bool,
@@ -72,7 +72,7 @@ impl ConfirmationState {
     pub fn new(cmd: String) -> Self {
         ConfirmationState {
             cmd,
-            selected: 0, // por defecto "Sí" está seleccionado (es más seguro que "No")
+            selected: 1, // por defecto "No": Enter sin pensar cancela
         }
     }
 

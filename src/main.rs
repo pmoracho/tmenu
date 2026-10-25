@@ -225,6 +225,14 @@ fn run_app(
             if key.kind != event::KeyEventKind::Press {
                 continue;
             }
+            if app.error_message.take().is_some() {
+                if key.modifiers.contains(event::KeyModifiers::CONTROL)
+                    && key.code == KeyCode::Char('q')
+                {
+                    return Ok(());
+                }
+                continue;
+            }
             if key.code == KeyCode::F(1) {
                 app.show_help = true;
                 let quit = run_help_modal(terminal, app)?;
@@ -336,8 +344,8 @@ fn run_wizard(
 
                     if done {
                         // Último campo confirmado: ejecutar
-                        app.finish_wizard(terminal)?;
-                        return Ok(false);
+                        let quit = app.finish_wizard(terminal)?;
+                        return Ok(quit);
                     }
                     // Si no es el último, el loop redibuja con el siguiente campo
                 }
@@ -399,7 +407,8 @@ pub fn run_confirmation_modal(
                     && key.code == KeyCode::Char('q') =>
                 {
                     app.confirmation = None;
-                    return Err(AppError::EventError("Cancelado por Ctrl+Q".to_string()));
+                    app.quit_requested = true;
+                    return Ok(false);
                 }
                 _ => {}
             }

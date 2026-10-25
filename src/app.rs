@@ -33,6 +33,8 @@ pub struct App {
     pub wizard: Option<WizardState>,
     pub confirmation: Option<ConfirmationState>,
     pub execution_mode: ExecutionMode,
+    pub error_message: Option<String>,
+    pub quit_requested: bool,
 }
 
 /// Implementación de métodos para `App`.
@@ -59,7 +61,22 @@ impl App {
             wizard: None,
             confirmation: None,
             execution_mode: config.execution_mode,
+            error_message: None,
+            quit_requested: false,
         })
+    }
+
+    /// Convierte `ForbiddenCommand` en un mensaje de UI en vez de abortar la app.
+    /// Cualquier otro error se propaga igual.
+    fn absorb_forbidden<T: Default>(&mut self, r: Result<T, AppError>) -> Result<T, AppError> {
+        match r {
+            Err(AppError::ForbiddenCommand(c)) => {
+                self.error_message =
+                    Some(t!("errors.forbidden_command", command = c).to_string());
+                Ok(T::default())
+            }
+            other => other,
+        }
     }
 
     /// Devuelve los ítems filtrados según el texto de búsqueda actual.
@@ -154,10 +171,12 @@ impl App {
                 if params.is_empty() {
                     // Sin interpolación: pedir confirmación solo si el ítem lo requiere
                     if item.require_confirmation {
-                        return self.request_command_confirmation(terminal, cmd, item.require_shell);
+                        let r = self.request_command_confirmation(terminal, cmd, item.require_shell);
+                        return self.absorb_forbidden(r);
                     } else {
                         // Ejecutar directo sin confirmación
-                        self.execute_external_command(terminal, cmd, item.require_shell)?;
+                        let r = self.execute_external_command(terminal, cmd, item.require_shell);
+                        self.absorb_forbidden(r)?;
                     }
                 } else {
                     // Con interpolación: iniciar wizard (no ejecutar todavía)
@@ -206,7 +225,7 @@ impl App {
             self.execute_external_command(terminal, cmd, use_shell)?;
         }
 
-        Ok(false)
+        Ok(self.quit_requested)
     }
 
     /// Ejecuta un comando externo en el shell del sistema operativo.
@@ -368,10 +387,12 @@ impl App {
 
             if require_confirmation {
                 // Pedir confirmación antes de ejecutar el comando resuelto
-                return self.request_command_confirmation(terminal, &cmd, require_shell);
+                let r = self.request_command_confirmation(terminal, &cmd, require_shell);
+                return self.absorb_forbidden(r);
             } else {
                 // Ejecutar directo sin confirmación
-                self.execute_external_command(terminal, &cmd, require_shell)?;
+                let r = self.execute_external_command(terminal, &cmd, require_shell);
+                self.absorb_forbidden(r)?;
             }
         }
         Ok(false)
@@ -613,6 +634,8 @@ mod tests {
             wizard: None,
             confirmation: None,
             execution_mode: ExecutionMode::Inherit,
+            error_message: None,
+            quit_requested: false,
         }
     }
 
@@ -628,5 +651,12 @@ mod tests {
         assert_eq!(app.filtered_items().len(), 1);
     }
 
+    #[test]
+    fn test_forbidden_command_no_propaga_error() {
+        let mut app = app_with_search("");
+        let r: Result<(), AppError> = Err(AppError::ForbiddenCommand("a;b".into()));
+        assert!(app.absorb_forbidden(r).is_ok());
+        assert!(app.error_message.is_some());
+    }
 
 }

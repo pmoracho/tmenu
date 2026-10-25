@@ -71,3 +71,6 @@ ui:
     title: " 🔍 Búsqueda "
   wizard:
     bottom_hints: " [Enter] Confirmar [Esc] Cancelar "
+  errors:
+    bottom_hints: " Presioná cualquier tecla "
+    title: " Error "
