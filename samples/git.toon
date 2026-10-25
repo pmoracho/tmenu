@@ -54,7 +54,7 @@ config:
     "🔙 Restaurar archivo": git checkout -- .
     "🧹 Limpiar archivos no trackeados": git clean -fd
   "🏷️ Etiquetas":
-    "🆕 Nueva tag": git tag {{test:Etiquete}}
+    "🆕 Nueva tag": git tag {{text:Etiquete}}
     "📌 Nueva tag anotada": git tag -a {{text: Etiqueta}} -m "Release {{text: Etiqueta}}"
     "📋 Listar tags": git tag -l
     "📤 Subir tags": git push --tags

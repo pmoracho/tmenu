@@ -291,9 +291,9 @@ impl App {
         if let Some(mut command) = command {
             match command.spawn() {
                 Ok(mut child) => {
-                    let _ = child.wait();
+                    let ret = child.wait();
                     // Registrar en historial solo si la ejecución fue exitosa
-                    if let Err(e) = history::log_command(cmd) {
+                    if let Err(e) = history::log_command(cmd) && ret.is_ok() {
                         eprintln!("{} {}", t!("errors.history_save"), e);
                     }
                 }
@@ -368,7 +368,7 @@ impl App {
         terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     ) -> Result<bool, AppError> {
         if let Some(ref wizard) = self.wizard {
-            let cmd = wizard.resolve();
+            let cmd = wizard.resolve(wizard.require_shell);
             let require_confirmation = wizard.require_confirmation;
             let require_shell = wizard.require_shell;
             self.wizard = None;
@@ -458,10 +458,20 @@ impl WizardState {
         }
     }
 
-    pub fn resolve(&self) -> String {
+    /// Construye el comando final reemplazando los placeholders por los valores ingresados.
+    /// Si `use_shell` es true, los valores se escapan con `shlex::quote` para que puedan contener espacios y caracteres especiales.
+    /// Si `use_shell` es false, los valores se insertan tal cual, respetando el quoting original del comando.
+    pub fn resolve(&self, use_shell: bool) -> String {
         let mut cmd = self.original_cmd.clone();
         for (param, value) in self.params.iter().zip(self.values.iter()) {
-            cmd = cmd.replace(&param.placeholder, value);
+            let substituted = if use_shell {
+                shlex::try_quote(value)
+                    .map(|quoted| quoted.into_owned())
+                    .unwrap_or_else(|_| value.clone())
+            } else {
+                value.clone()
+            };
+            cmd = cmd.replace(&param.placeholder, &substituted);
         }
         cmd
     }
@@ -481,5 +491,108 @@ fn wait_for_any_key() -> Result<(), std::io::Error> {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::CommandParam;
+
+    /// Crea un WizardState con un solo parámetro ya "confirmado",
+    /// simulando que el usuario ya pasó por el wizard y tipeó `value`.
+    fn wizard_with_value(cmd: &str, value: &str, require_shell: bool) -> WizardState {
+        let params = vec![CommandParam {
+            label: "patrón".to_string(),
+            placeholder: "{{text: patrón}}".to_string(),
+        }];
+        let mut wizard = WizardState::new(params, cmd.to_string(), false, require_shell);
+        wizard.values[0] = value.to_string();
+        wizard
+    }
+
+    #[test]
+    fn test_resolve_no_shell_plain_value() {
+        let wizard = wizard_with_value("grep {{text: patrón}} file.log", "error", false);
+        assert_eq!(wizard.resolve(false), "grep error file.log");
+    }
+
+    #[test]
+    fn test_resolve_no_shell_does_not_quote() {
+        // En modo no-shell no se escapa: el comando entero pasa luego por
+        // shlex::split en execute_external_command, así que acá el valor
+        // se sustituye literal.
+        let wizard = wizard_with_value("grep {{text: patrón}} file.log", "foo bar", false);
+        assert_eq!(wizard.resolve(false), "grep foo bar file.log");
+    }
+
+    #[test]
+    fn test_resolve_shell_quotes_simple_value() {
+        let wizard = wizard_with_value("grep {{text: patrón}} file.log", "error", true);
+        let resolved = wizard.resolve(true);
+        let tokens = shlex::split(&resolved).expect("comando debe ser válido para shlex");
+        assert_eq!(tokens, vec!["grep", "error", "file.log"]);
+    }
+
+    #[test]
+    fn test_resolve_shell_quotes_value_with_spaces() {
+        let wizard = wizard_with_value("grep {{text: patrón}} file.log", "foo bar", true);
+        let resolved = wizard.resolve(true);
+        let tokens = shlex::split(&resolved).expect("comando debe ser válido para shlex");
+        // "foo bar" debe quedar como UN solo token, no dos
+        assert_eq!(tokens, vec!["grep", "foo bar", "file.log"]);
+    }
+
+    #[test]
+    fn test_resolve_shell_neutralizes_semicolon_injection() {
+        let wizard = wizard_with_value(
+            "grep {{text: patrón}} logs/*.log",
+            "foo; rm -rf ~",
+            true,
+        );
+        let resolved = wizard.resolve(true);
+        let tokens = shlex::split(&resolved).expect("comando debe ser válido para shlex");
+        // El ';' debe quedar DENTRO del token, no actuar como separador de shell
+        assert_eq!(tokens, vec!["grep", "foo; rm -rf ~", "logs/*.log"]);
+    }
+
+    #[test]
+    fn test_resolve_shell_neutralizes_command_substitution() {
+        let wizard = wizard_with_value("echo {{text: patrón}}", "$(whoami)", true);
+        let resolved = wizard.resolve(true);
+        let tokens = shlex::split(&resolved).expect("comando debe ser válido para shlex");
+        // El $(...) debe quedar como texto literal en un único token
+        assert_eq!(tokens, vec!["echo", "$(whoami)"]);
+    }
+
+    #[test]
+    fn test_resolve_shell_value_with_single_quote_is_safely_escaped() {
+        let wizard = wizard_with_value("echo {{text: patrón}}", "it's here", true);
+        let resolved = wizard.resolve(true);
+        let tokens = shlex::split(&resolved).expect("comando debe ser válido para shlex");
+        // El valor con apóstrofe debe sobrevivir intacto al ida-y-vuelta de escape
+        assert_eq!(tokens, vec!["echo", "it's here"]);
+    }
+
+    #[test]
+    fn test_resolve_multiple_placeholders_same_param() {
+        // Si el mismo placeholder aparece dos veces en el comando original,
+        // ambas ocurrencias deben resolverse (comportamiento de String::replace).
+        let params = vec![CommandParam {
+            label: "Etiqueta".to_string(),
+            placeholder: "{{text: Etiqueta}}".to_string(),
+        }];
+        let mut wizard = WizardState::new(
+            params,
+            "git tag -a {{text: Etiqueta}} -m \"Release {{text: Etiqueta}}\"".to_string(),
+            false,
+            false,
+        );
+        wizard.values[0] = "v1.0.0".to_string();
+
+        assert_eq!(
+            wizard.resolve(false),
+            "git tag -a v1.0.0 -m \"Release v1.0.0\""
+        );
     }
 }
